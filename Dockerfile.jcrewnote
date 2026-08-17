@@ -3,6 +3,9 @@ FROM brufdev/many-notes@sha256:dc534206a4b39fc78c0528e0bbf0dba816e2f5a55cb6b2218
 FROM node:22-alpine AS frontend
 WORKDIR /app
 
+ARG VITE_REVERB_APP_KEY
+ENV VITE_REVERB_APP_KEY=${VITE_REVERB_APP_KEY}
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
