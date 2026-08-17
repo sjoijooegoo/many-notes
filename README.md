@@ -18,7 +18,7 @@
 
 - Paste screenshots or copied image files directly into the visual editor with `Ctrl + V`.
 - Drag image files into either the visual editor or raw Markdown editor.
-- Upload images to the same vault folder as the current note and insert the Markdown reference automatically.
+- Store new uploads under `attachments/images` beside the current note and insert the Markdown reference automatically.
 - Support PNG, JPEG, GIF, WebP, and AVIF images.
 - Build on the pinned upstream container while preserving the existing database and vault bind mounts.
 

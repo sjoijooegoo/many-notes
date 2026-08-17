@@ -16,17 +16,22 @@ inserts the image at the current caret or drop position.
 
 ## Storage behavior
 
-An uploaded image becomes a regular `VaultNode` in the same folder as the current note. For example:
+An uploaded image becomes a regular `VaultNode` under an `attachments/images` folder beside the
+current note. Missing folders are created automatically. For example:
 
 ```text
 jcrEw Vault/CodexNote/Guide.md
-jcrEw Vault/CodexNote/screenshot.png
+jcrEw Vault/CodexNote/attachments/images/20260817-132455-384-a7c2f9.png
 ```
+
+New filenames use the browser's local date and time, milliseconds, and a random suffix to remain
+readable while avoiding collisions during multi-image or rapid successive pastes. Existing images
+are not moved or renamed.
 
 With the production bind mounts in this repository, the physical host path follows this pattern:
 
 ```text
-/srv/many-notes/private/vaults/<user-id>/<vault-name>/<folder>/<image-name>
+/srv/many-notes/private/vaults/<user-id>/<vault-name>/<note-folder>/attachments/images/<image-name>
 ```
 
 Many Notes generates a non-conflicting filename when a file with the same name already exists.
