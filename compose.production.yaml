@@ -1,0 +1,25 @@
+name: many-notes
+
+services:
+    many-notes:
+        build:
+            context: .
+            dockerfile: Dockerfile.jcrewnote
+            args:
+                UID: 1000
+                GID: 1000
+        image: jcrewnote/many-notes:0.16.2-image-upload
+        restart: unless-stopped
+        environment:
+            APP_URL: https://jcrewnote.top
+            APP_TIMEZONE: Asia/Shanghai
+        volumes:
+            - /srv/many-notes/database:/var/www/html/database/sqlite
+            - /srv/many-notes/logs:/var/www/html/storage/logs
+            - /srv/many-notes/private:/var/www/html/storage/app/private
+            - /srv/many-notes/typesense:/var/www/html/typesense
+        ports:
+            - 127.0.0.1:8080:8080
+        mem_reservation: 256m
+        mem_limit: 768m
+        pids_limit: 256

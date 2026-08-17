@@ -1,0 +1,27 @@
+FROM brufdev/many-notes@sha256:dc534206a4b39fc78c0528e0bbf0dba816e2f5a55cb6b22182e3678b3c54a16b AS upstream
+
+FROM node:22-alpine AS frontend
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+COPY --from=upstream /var/www/html/resources/js/actions ./resources/js/actions
+COPY --from=upstream /var/www/html/resources/js/routes ./resources/js/routes
+COPY --from=upstream /var/www/html/resources/js/wayfinder ./resources/js/wayfinder
+
+ENV SKIP_WAYFINDER=1
+RUN npm run build
+
+FROM upstream
+
+USER root
+ARG UID=1000
+ARG GID=1000
+RUN docker-php-serversideup-set-id www-data ${UID}:${GID} && \
+    docker-php-serversideup-set-file-permissions --owner ${UID}:${GID} --service nginx
+
+COPY --from=frontend --chown=www-data:www-data /app/public/build /var/www/html/public/build
+
+USER www-data

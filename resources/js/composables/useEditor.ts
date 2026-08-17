@@ -17,6 +17,11 @@ import StarterKit from '@tiptap/starter-kit';
 import { common, createLowlight } from 'lowlight';
 import { onMounted, onUnmounted, Ref, shallowRef, watch } from 'vue';
 
+interface UploadedImage {
+    name: string;
+    full_path: string;
+}
+
 interface SetupEditorOptions {
     vaultId: string;
     element: Ref<HTMLElement | null>;
@@ -26,6 +31,7 @@ interface SetupEditorOptions {
     isEditMode: Readonly<Ref<boolean>>;
     onUpdate: (markdown: string) => void;
     openFilePath: (path: string) => void;
+    uploadImages: (files: File[]) => Promise<UploadedImage[]>;
 }
 
 export function useEditor(options: SetupEditorOptions) {
@@ -79,6 +85,35 @@ export function useEditor(options: SetupEditorOptions) {
 
     const content = options.content ? markedService.parse(encodeText(options.content)) : '';
 
+    function localImages(files: FileList | null): File[] {
+        return files ? Array.from(files).filter(file => file.type.startsWith('image/')) : [];
+    }
+
+    async function uploadAndInsertImages(files: File[], position: number): Promise<void> {
+        const uploaded = await options.uploadImages(files);
+
+        if (!editor.value || uploaded.length === 0) {
+            return;
+        }
+
+        const safePosition = Math.min(position, editor.value.state.doc.content.size);
+        let chain = editor.value.chain().focus().setTextSelection(safePosition);
+
+        for (const image of uploaded) {
+            let src = image.full_path;
+
+            try {
+                src = encodeURI(src);
+            } catch {
+                // Keep the original path when the browser cannot encode it.
+            }
+
+            chain = chain.setImage({ src, alt: image.name, title: image.name });
+        }
+
+        chain.run();
+    }
+
     onMounted(() => {
         editor.value = new Editor({
             element: options.element.value,
@@ -130,6 +165,41 @@ export function useEditor(options: SetupEditorOptions) {
             editorProps: {
                 attributes: {
                     class: 'h-full !max-w-none flow-root focus:outline-none prose dark:prose-invert',
+                },
+                handlePaste(view, event) {
+                    if (!options.isEditMode.value) {
+                        return false;
+                    }
+
+                    const files = localImages(event.clipboardData?.files ?? null);
+
+                    if (files.length === 0) {
+                        return false;
+                    }
+
+                    event.preventDefault();
+                    const position = view.state.selection.from;
+                    void uploadAndInsertImages(files, position).catch(() => undefined);
+
+                    return true;
+                },
+                handleDrop(view, event, _slice, moved) {
+                    if (!options.isEditMode.value || moved) {
+                        return false;
+                    }
+
+                    const files = localImages(event.dataTransfer?.files ?? null);
+
+                    if (files.length === 0) {
+                        return false;
+                    }
+
+                    event.preventDefault();
+                    const position = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                    const insertAt = position?.pos ?? view.state.selection.from;
+                    void uploadAndInsertImages(files, insertAt).catch(() => undefined);
+
+                    return true;
                 },
             },
             onCreate(props) {

@@ -1,0 +1,9 @@
+.git
+.env*
+node_modules
+public/build
+public/hot
+storage
+tests/Browser/Screenshots
+typesense
+vendor
