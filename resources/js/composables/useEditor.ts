@@ -72,7 +72,7 @@ export function useEditor(options: SetupEditorOptions) {
                 }
 
                 try {
-                    return `[${text}](${encodeURI(path)}${title})`;
+                    return `[${text}](${encodeURI(decodeURI(path))}${title})`;
                 } catch {
                     return `[${text}](${path}${title})`;
                 }

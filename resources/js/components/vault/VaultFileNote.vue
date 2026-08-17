@@ -156,15 +156,8 @@ async function insertRawMarkdownImages(files: File[], offset: number): Promise<v
     const markdown = uploaded
         .map(image => {
             const alt = image.name.replaceAll('[', '\\[').replaceAll(']', '\\]');
-            let path = image.full_path;
 
-            try {
-                path = encodeURI(path);
-            } catch {
-                // Keep the original path when the browser cannot encode it.
-            }
-
-            return `![${alt}](${path})`;
+            return `![${alt}](${image.full_path})`;
         })
         .join('\n');
     const prefix = safeOffset > 0 && current[safeOffset - 1] !== '\n' ? '\n' : '';

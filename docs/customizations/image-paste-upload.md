@@ -28,6 +28,10 @@ New filenames use the browser's local date and time, milliseconds, and a random 
 readable while avoiding collisions during multi-image or rapid successive pastes. Existing images
 are not moved or renamed.
 
+Markdown stores Unicode folder names directly, for example `/CodexNote/服务器运维/...`. The editor
+encodes the URL once while rendering. Pre-encoding Unicode segments in stored Markdown would cause
+the percent signs to be encoded again and make the image unavailable.
+
 With the production bind mounts in this repository, the physical host path follows this pattern:
 
 ```text
