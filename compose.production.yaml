@@ -8,7 +8,7 @@ services:
             args:
                 UID: 1000
                 GID: 1000
-        image: jcrewnote/many-notes:0.16.2-image-upload
+        image: jcrewnote/many-notes:0.16.2-image-upload.2
         restart: unless-stopped
         environment:
             APP_URL: https://jcrewnote.top

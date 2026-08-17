@@ -20,7 +20,8 @@ USER root
 ARG UID=1000
 ARG GID=1000
 RUN docker-php-serversideup-set-id www-data ${UID}:${GID} && \
-    docker-php-serversideup-set-file-permissions --owner ${UID}:${GID} --service nginx
+    docker-php-serversideup-set-file-permissions --owner ${UID}:${GID} --service nginx && \
+    rm -rf /var/www/html/public/build
 
 COPY --from=frontend --chown=www-data:www-data /app/public/build /var/www/html/public/build
 
