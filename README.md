@@ -9,6 +9,38 @@
     <img alt="License" src="https://img.shields.io/github/license/brufdev/many-notes" />
 </p>
 
+> [!NOTE]
+> This repository is the **jcrEw Note** self-hosted edition, based on upstream
+> [Many Notes v0.16.2](https://github.com/brufdev/many-notes/releases/tag/v0.16.2).
+> It keeps the upstream Git history and adds image paste/drop support for Markdown notes.
+
+## jcrEw Note customizations
+
+- Paste screenshots or copied image files directly into the visual editor with `Ctrl + V`.
+- Drag image files into either the visual editor or raw Markdown editor.
+- Upload images to the same vault folder as the current note and insert the Markdown reference automatically.
+- Support PNG, JPEG, GIF, WebP, and AVIF images.
+- Build on the pinned upstream container while preserving the existing database and vault bind mounts.
+
+See [image paste and storage behavior](./docs/customizations/image-paste-upload.md) for details and
+[the jcrEw deployment runbook](./DEPLOYMENT.jcrewnote.md) for build, deployment, backup, and rollback instructions.
+
+### Quick deployment
+
+Review `compose.production.yaml`, especially `APP_URL`, bind-mount paths, UID/GID, and the published
+loopback port, then run:
+
+```bash
+docker compose -f compose.production.yaml build
+docker compose -f compose.production.yaml up -d
+docker compose -f compose.production.yaml ps
+```
+
+The included production compose file is configured for `https://jcrewnote.top`, listens only on
+`127.0.0.1:8080`, and expects a reverse proxy such as Caddy to provide public HTTPS access.
+
+---
+
 Many Notes is a Markdown note-taking web application designed for simplicity! Easily create or import your vaults and organize your thoughts right away.
 
 It uses a database to power its features, but your files are also saved in the filesystem, giving you full control over your vault structure and ensuring easy access and portability.
