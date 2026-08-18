@@ -80,3 +80,25 @@ export function resolveVaultImagePath(
 
     return normalizeVaultPath(`${noteDirectory}/${decodedPath}`);
 }
+
+export function resolveServerVaultImagePath(
+    vaultPath: string,
+    ownerId: number,
+    vaultName: string,
+    privateStorageRoot: string = '/srv/many-notes/private'
+): string | null {
+    if (
+        !vaultPath.startsWith('/') ||
+        !Number.isInteger(ownerId) ||
+        ownerId < 1 ||
+        vaultName === '' ||
+        vaultName === '.' ||
+        vaultName === '..' ||
+        vaultName.includes('/') ||
+        vaultName.includes('\0')
+    ) {
+        return null;
+    }
+
+    return `${privateStorageRoot.replace(/\/$/, '')}/vaults/${ownerId}/${vaultName}${vaultPath}`;
+}

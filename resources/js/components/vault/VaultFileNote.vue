@@ -7,9 +7,11 @@ import { useToast } from '@/composables/useToast';
 import { useVaultActions } from '@/composables/useVaultActions';
 import { imageFiles, useVaultImageUpload } from '@/composables/useVaultImageUpload';
 import DocumentDuplicate from '@/icons/DocumentDuplicate.vue';
-import { resolveVaultImagePath } from '@/services/vault-image-path';
+import { resolveServerVaultImagePath, resolveVaultImagePath } from '@/services/vault-image-path';
 import { useLayoutStore } from '@/stores/layout';
 import { VaultNode } from '@/types/vault';
+import { VaultShowPageProps } from '@/types/vault.pages';
+import { usePage } from '@inertiajs/vue3';
 import { Editor } from '@tiptap/core';
 import { BubbleMenu } from '@tiptap/vue-3/menus';
 import { inject, onMounted, ref, ShallowRef } from 'vue';
@@ -25,6 +27,7 @@ interface VaultFileNodeEmits {
 const props = defineProps<VaultFileNodeProps>();
 const emit = defineEmits<VaultFileNodeEmits>();
 
+const page = usePage<VaultShowPageProps>();
 const layoutStore = useLayoutStore();
 const { createToast } = useToast();
 const vaultActions = useVaultActions();
@@ -95,8 +98,19 @@ function selectedImagePath(selectedEditor: Editor | null = editor.value): string
     return resolveVaultImagePath(selectedEditor.getAttributes('image').src, props.node.full_path);
 }
 
+function selectedImageServerPath(selectedEditor: Editor | null = editor.value): string | null {
+    const vaultPath = selectedImagePath(selectedEditor);
+    const vault = page.props.vault;
+
+    if (!vaultPath || vault.id !== props.node.vault_id) {
+        return null;
+    }
+
+    return resolveServerVaultImagePath(vaultPath, vault.user.id, vault.name);
+}
+
 function showImagePathMenu({ editor: selectedEditor }: { editor: Editor }): boolean {
-    return !isEditingMarkdown.value && selectedImagePath(selectedEditor) !== null;
+    return !isEditingMarkdown.value && selectedImageServerPath(selectedEditor) !== null;
 }
 
 async function writeClipboard(text: string): Promise<void> {
@@ -121,18 +135,18 @@ async function writeClipboard(text: string): Promise<void> {
 }
 
 async function copySelectedImagePath(): Promise<void> {
-    const path = selectedImagePath();
+    const path = selectedImageServerPath();
 
     if (!path) {
-        createToast('This image does not have a local vault path', 'error');
+        createToast('This image does not have a local server path', 'error');
         return;
     }
 
     try {
         await writeClipboard(path);
-        createToast('Image path copied', 'success');
+        createToast('Server image path copied', 'success');
     } catch {
-        createToast('Unable to copy image path', 'error');
+        createToast('Unable to copy server image path', 'error');
     }
 }
 
@@ -269,13 +283,13 @@ onMounted(() => {
             >
                 <button
                     type="button"
-                    title="Copy vault path"
-                    aria-label="Copy vault path"
+                    title="Copy server path"
+                    aria-label="Copy server path"
                     class="hover:bg-light-base-400 dark:hover:bg-base-700 flex h-8 w-8 items-center justify-center rounded transition-colors"
                     @click="copySelectedImagePath"
                 >
                     <DocumentDuplicate class="h-4.5 w-4.5" />
-                    <span class="sr-only">Copy path</span>
+                    <span class="sr-only">Copy server path</span>
                 </button>
             </div>
         </BubbleMenu>
