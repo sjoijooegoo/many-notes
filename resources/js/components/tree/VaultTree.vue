@@ -14,6 +14,7 @@ import FolderPlus from '@/icons/FolderPlus.vue';
 import PencilSquare from '@/icons/PencilSquare.vue';
 import Spinner from '@/icons/Spinner.vue';
 import UserGroup from '@/icons/UserGroup.vue';
+import { vaultFileDataType } from '@/services/vault-file-drag';
 import { useLayoutStore } from '@/stores/layout';
 import { useVaultStore } from '@/stores/vault';
 import { useVaultTreeStore } from '@/stores/vaultTree';
@@ -73,8 +74,8 @@ function onDragStart(event: DragEvent, nodeId: number): void {
 
     if (node !== null && node.is_file) {
         event.dataTransfer.setData(
-            'application/vault-file',
-            JSON.stringify({ name: node.name, url: node.full_path })
+            vaultFileDataType,
+            JSON.stringify({ name: node.name, url: node.full_path, type: node.type })
         );
     }
 }

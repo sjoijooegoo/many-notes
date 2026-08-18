@@ -6,6 +6,7 @@ import { useTiptapPreferences } from '@/composables/useTiptapPreferences';
 import { useToast } from '@/composables/useToast';
 import { useVaultActions } from '@/composables/useVaultActions';
 import { imageFiles, useVaultImageUpload } from '@/composables/useVaultImageUpload';
+import { parseVaultFileDrag, vaultFileMarkdown } from '@/services/vault-file-drag';
 import { resolveServerVaultImagePath, resolveVaultImagePath } from '@/services/vault-image-path';
 import { useLayoutStore } from '@/stores/layout';
 import { VaultNode } from '@/types/vault';
@@ -210,22 +211,13 @@ function moveCaretToDropPoint(event: DragEvent): void {
     selection?.addRange(range);
 }
 
-async function insertRawMarkdownImages(files: File[], offset: number): Promise<void> {
-    const uploaded = await uploadImages(files);
-
-    if (!noteMarkdownRef.value || uploaded.length === 0) {
+async function insertRawMarkdown(markdown: string, offset: number): Promise<void> {
+    if (!noteMarkdownRef.value || markdown === '') {
         return;
     }
 
     const current = noteMarkdownRef.value.textContent ?? '';
     const safeOffset = Math.min(offset, current.length);
-    const markdown = uploaded
-        .map(image => {
-            const alt = image.name.replaceAll('[', '\\[').replaceAll(']', '\\]');
-
-            return `![${alt}](${image.full_path})`;
-        })
-        .join('\n');
     const prefix = safeOffset > 0 && current[safeOffset - 1] !== '\n' ? '\n' : '';
     const suffix = safeOffset < current.length && current[safeOffset] !== '\n' ? '\n' : '';
     const insertion = `${prefix}${markdown}${suffix}`;
@@ -234,6 +226,19 @@ async function insertRawMarkdownImages(files: File[], offset: number): Promise<v
     noteMarkdownRef.value.textContent = updated;
     setCaretOffset(noteMarkdownRef.value, safeOffset + insertion.length);
     await editorContext?.value?.onMarkdownChanged(updated);
+}
+
+async function insertRawMarkdownImages(files: File[], offset: number): Promise<void> {
+    const uploaded = await uploadImages(files);
+    const markdown = uploaded
+        .map(image => {
+            const alt = image.name.replaceAll('[', '\\[').replaceAll(']', '\\]');
+
+            return `![${alt}](${image.full_path})`;
+        })
+        .join('\n');
+
+    await insertRawMarkdown(markdown, offset);
 }
 
 function onMarkdownPaste(event: ClipboardEvent): void {
@@ -249,6 +254,17 @@ function onMarkdownPaste(event: ClipboardEvent): void {
 }
 
 function onMarkdownDrop(event: DragEvent): void {
+    const vaultFile = parseVaultFileDrag(event.dataTransfer);
+
+    if (vaultFile && noteMarkdownRef.value) {
+        event.preventDefault();
+        moveCaretToDropPoint(event);
+        const offset = caretOffset(noteMarkdownRef.value);
+        void insertRawMarkdown(vaultFileMarkdown(vaultFile), offset).catch(() => undefined);
+
+        return;
+    }
+
     const files = imageFiles(event.dataTransfer?.files ?? []);
 
     if (files.length === 0 || !noteMarkdownRef.value) {

@@ -1,30 +1,27 @@
 import { Extension } from '@tiptap/core';
 import { Fragment } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-
-interface VaultFileDragPayload {
-    name: string;
-    url: string;
-}
+import { parseVaultFileDrag } from '../vault-file-drag';
 
 export const VaultFileDrop = Extension.create({
     name: 'vaultFileDrop',
 
     addProseMirrorPlugins() {
+        const editor = this.editor;
+
         return [
             new Plugin({
                 key: new PluginKey('vaultFileDrop'),
                 props: {
                     handleDrop(view, event) {
-                        const raw = event.dataTransfer?.getData('application/vault-file');
+                        const file = parseVaultFileDrag(event.dataTransfer);
 
-                        if (!raw) {
+                        if (!file) {
                             return false;
                         }
 
                         event.preventDefault();
 
-                        const { name, url } = JSON.parse(raw) as VaultFileDragPayload;
                         const position = view.posAtCoords({
                             left: event.clientX,
                             top: event.clientY,
@@ -34,8 +31,21 @@ export const VaultFileDrop = Extension.create({
                             return true;
                         }
 
+                        if (file.type === 'image') {
+                            editor
+                                .chain()
+                                .focus()
+                                .insertContentAt(position.pos, {
+                                    type: 'image',
+                                    attrs: { src: file.url, alt: file.name },
+                                })
+                                .run();
+
+                            return true;
+                        }
+
                         const { schema, tr } = view.state;
-                        const linkMark = schema.marks.link?.create({ href: url });
+                        const linkMark = schema.marks.link?.create({ href: file.url });
 
                         if (!linkMark) {
                             return true;
@@ -55,7 +65,7 @@ export const VaultFileDrop = Extension.create({
                             position.pos,
                             Fragment.fromArray([
                                 ...prefix,
-                                schema.text(name, [linkMark]),
+                                schema.text(file.name, [linkMark]),
                                 ...suffix,
                             ])
                         );
