@@ -12,8 +12,6 @@ import { useLayoutStore } from '@/stores/layout';
 import { VaultNode } from '@/types/vault';
 import { VaultShowPageProps } from '@/types/vault.pages';
 import { usePage } from '@inertiajs/vue3';
-import { Editor } from '@tiptap/core';
-import { BubbleMenu } from '@tiptap/vue-3/menus';
 import { inject, onMounted, ref, ShallowRef } from 'vue';
 
 interface VaultFileNodeProps {
@@ -43,8 +41,6 @@ if (!editorContext) {
 
 const noteEditorRef = ref<HTMLElement | null>(null);
 const noteMarkdownRef = ref<HTMLElement | null>(null);
-const noteRootRef = ref<HTMLElement | null>(null);
-const fileScrollContainer = ref<HTMLElement | null>(null);
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -90,18 +86,12 @@ const { editor, setContent, onMarkdownChanged } = useEditor({
     },
     openFilePath: vaultActions.openFilePath,
     uploadImages,
+    canCopyImagePath,
+    copyImagePath,
 });
 
-function selectedImagePath(selectedEditor: Editor | null = editor.value): string | null {
-    if (!selectedEditor?.isActive('image')) {
-        return null;
-    }
-
-    return resolveVaultImagePath(selectedEditor.getAttributes('image').src, props.node.full_path);
-}
-
-function selectedImageServerPath(selectedEditor: Editor | null = editor.value): string | null {
-    const vaultPath = selectedImagePath(selectedEditor);
+function imageServerPath(source: string): string | null {
+    const vaultPath = resolveVaultImagePath(source, props.node.full_path);
     const vault = page.props.vault;
 
     if (!vaultPath || vault.id !== props.node.vault_id) {
@@ -111,8 +101,8 @@ function selectedImageServerPath(selectedEditor: Editor | null = editor.value): 
     return resolveServerVaultImagePath(vaultPath, vault.user.id, vault.name);
 }
 
-function showImagePathMenu({ editor: selectedEditor }: { editor: Editor }): boolean {
-    return !isEditingMarkdown.value && selectedImageServerPath(selectedEditor) !== null;
+function canCopyImagePath(source: string): boolean {
+    return imageServerPath(source) !== null;
 }
 
 async function writeClipboard(text: string): Promise<void> {
@@ -136,8 +126,8 @@ async function writeClipboard(text: string): Promise<void> {
     }
 }
 
-async function copySelectedImagePath(): Promise<void> {
-    const path = selectedImageServerPath();
+async function copyImagePath(source: string): Promise<void> {
+    const path = imageServerPath(source);
 
     if (!path) {
         createToast('This image does not have a local server path', 'error');
@@ -280,49 +270,12 @@ function onMarkdownDrop(event: DragEvent): void {
 }
 
 onMounted(() => {
-    fileScrollContainer.value =
-        noteRootRef.value?.closest<HTMLElement>('[data-vault-file-scroll]') ?? null;
     editorContext.value = { editor, setContent, onMarkdownChanged };
 });
 </script>
 
 <template>
-    <div ref="noteRootRef" class="flex h-full w-full flex-col">
-        <BubbleMenu
-            v-if="editor && fileScrollContainer"
-            :editor="editor"
-            :should-show="showImagePathMenu"
-            :options="{
-                placement: 'top-end',
-                offset: { mainAxis: -28, crossAxis: -8 },
-                scrollTarget: fileScrollContainer,
-                hide: {},
-            }"
-        >
-            <button
-                type="button"
-                title="Copy server path"
-                aria-label="Copy server path"
-                class="text-light-base-700 dark:text-base-200 h-4 w-4 opacity-80 transition-opacity hover:opacity-100 focus:outline-none"
-                @click="copySelectedImagePath"
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                >
-                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                </svg>
-                <span class="sr-only">Copy server path</span>
-            </button>
-        </BubbleMenu>
-
+    <div class="flex h-full w-full flex-col">
         <div
             ref="noteEditorRef"
             class="h-full w-full px-4"
@@ -345,9 +298,18 @@ onMounted(() => {
 </template>
 
 <style scoped>
-:deep(img.ProseMirror-selectednode) {
+:deep(.vault-image-node.ProseMirror-selectednode) {
+    outline: none;
+}
+
+:deep(.vault-image-node.ProseMirror-selectednode img) {
     outline: 2px solid rgb(255 255 255 / 95%);
     outline-offset: -2px;
     box-shadow: 0 0 0 1px rgb(0 0 0 / 35%);
+}
+
+:deep(.vault-image-node.ProseMirror-selectednode .vault-image-copy-button) {
+    pointer-events: auto;
+    opacity: 0.8;
 }
 </style>

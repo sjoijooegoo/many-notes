@@ -1,6 +1,7 @@
 import { type Editor, type NodeViewRenderer } from '@tiptap/core';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { type Node } from '@tiptap/pm/model';
+import { createCopyButton } from './create-copy-button';
 
 export const CustomCodeBlockLowlight = CodeBlockLowlight.extend({
     addNodeView(): NodeViewRenderer {
@@ -31,31 +32,28 @@ export const CustomCodeBlockLowlight = CodeBlockLowlight.extend({
             header.appendChild(languageSpan);
 
             if (navigator.clipboard) {
-                const button = document.createElement('button');
-                button.classList.add('w-4', 'h-4', 'mt-1', 'focus:outline-none');
-                button.innerHTML =
-                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+                const button = createCopyButton({
+                    title: 'Copy code',
+                    onClick: async () => {
+                        const pos = getPos();
 
-                button.addEventListener('click', async (e: MouseEvent) => {
-                    e.preventDefault();
+                        if (pos === undefined) {
+                            return;
+                        }
 
-                    const pos = getPos();
+                        const domNode = editor.view.nodeDOM(pos);
+                        const code = (domNode as Element | null)?.querySelector('code');
 
-                    if (pos === undefined) {
-                        return;
-                    }
+                        if (!code) {
+                            return;
+                        }
 
-                    const domNode = editor.view.nodeDOM(pos);
-                    const code = (domNode as Element | null)?.querySelector('code');
-
-                    if (!code) {
-                        return;
-                    }
-
-                    editor.commands.focus();
-                    editor.commands.setTextSelection(pos + 1);
-                    await navigator.clipboard.writeText(code.textContent ?? '');
+                        editor.commands.focus();
+                        editor.commands.setTextSelection(pos + 1);
+                        await navigator.clipboard.writeText(code.textContent ?? '');
+                    },
                 });
+                button.classList.add('mt-1');
 
                 header.appendChild(button);
             }

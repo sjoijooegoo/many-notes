@@ -33,6 +33,8 @@ interface SetupEditorOptions {
     onUpdate: (markdown: string) => void;
     openFilePath: (path: string) => void;
     uploadImages: (files: File[]) => Promise<UploadedImage[]>;
+    canCopyImagePath: (src: string) => boolean;
+    copyImagePath: (src: string) => void | Promise<void>;
 }
 
 export function useEditor(options: SetupEditorOptions) {
@@ -137,6 +139,8 @@ export function useEditor(options: SetupEditorOptions) {
                 }),
                 CustomImage.configure({
                     vaultId: options.vaultId,
+                    canCopyPath: options.canCopyImagePath,
+                    onCopyPath: options.copyImagePath,
                 }),
                 CustomLink.configure({
                     autolink: false,
