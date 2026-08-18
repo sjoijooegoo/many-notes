@@ -43,6 +43,8 @@ if (!editorContext) {
 
 const noteEditorRef = ref<HTMLElement | null>(null);
 const noteMarkdownRef = ref<HTMLElement | null>(null);
+const noteRootRef = ref<HTMLElement | null>(null);
+const fileScrollContainer = ref<HTMLElement | null>(null);
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -278,19 +280,23 @@ function onMarkdownDrop(event: DragEvent): void {
 }
 
 onMounted(() => {
+    fileScrollContainer.value =
+        noteRootRef.value?.closest<HTMLElement>('[data-vault-file-scroll]') ?? null;
     editorContext.value = { editor, setContent, onMarkdownChanged };
 });
 </script>
 
 <template>
-    <div class="flex h-full w-full flex-col">
+    <div ref="noteRootRef" class="flex h-full w-full flex-col">
         <BubbleMenu
-            v-if="editor"
+            v-if="editor && fileScrollContainer"
             :editor="editor"
             :should-show="showImagePathMenu"
             :options="{
                 placement: 'top-end',
                 offset: { mainAxis: -28, crossAxis: -8 },
+                scrollTarget: fileScrollContainer,
+                hide: {},
             }"
         >
             <button

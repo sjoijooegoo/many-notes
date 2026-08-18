@@ -98,7 +98,7 @@ watch(
             </div>
             <slot name="toolbar" />
         </div>
-        <div class="mb-4 flex w-full flex-grow overflow-y-auto">
+        <div data-vault-file-scroll class="mb-4 flex w-full flex-grow overflow-y-auto">
             <slot />
         </div>
     </div>
