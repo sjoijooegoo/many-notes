@@ -288,7 +288,7 @@ onMounted(() => {
                     class="hover:bg-light-base-400 dark:hover:bg-base-700 flex h-8 w-8 items-center justify-center rounded transition-colors"
                     @click="copySelectedImagePath"
                 >
-                    <DocumentDuplicate class="h-4.5 w-4.5" />
+                    <DocumentDuplicate class="h-4 w-4" />
                     <span class="sr-only">Copy server path</span>
                 </button>
             </div>
@@ -314,3 +314,11 @@ onMounted(() => {
         />
     </div>
 </template>
+
+<style scoped>
+:deep(img.ProseMirror-selectednode) {
+    outline: 2px solid rgb(255 255 255 / 95%);
+    outline-offset: -2px;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 35%);
+}
+</style>
