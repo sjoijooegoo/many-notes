@@ -274,7 +274,7 @@ onMounted(() => {
             :should-show="showImagePathMenu"
             :options="{
                 placement: 'top-end',
-                offset: { mainAxis: -24, crossAxis: -8 },
+                offset: { mainAxis: -28, crossAxis: -8 },
             }"
         >
             <button
