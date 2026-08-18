@@ -259,19 +259,23 @@ onMounted(() => {
             v-if="editor"
             :editor="editor"
             :should-show="showImagePathMenu"
-            :options="{ placement: 'top', offset: 8 }"
+            :options="{
+                placement: 'top-end',
+                offset: { mainAxis: -40, crossAxis: -8 },
+            }"
         >
             <div
-                class="border-light-base-400 bg-light-base-50 dark:border-base-700 dark:bg-base-900 flex rounded border p-1 shadow-lg"
+                class="border-light-base-400/80 bg-light-base-50/90 dark:border-base-700/80 dark:bg-base-900/90 flex rounded-md border p-1 shadow-lg backdrop-blur-sm"
             >
                 <button
                     type="button"
                     title="Copy vault path"
-                    class="hover:bg-light-base-400 dark:hover:bg-base-700 flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors"
+                    aria-label="Copy vault path"
+                    class="hover:bg-light-base-400 dark:hover:bg-base-700 flex h-8 w-8 items-center justify-center rounded transition-colors"
                     @click="copySelectedImagePath"
                 >
-                    <DocumentDuplicate class="h-4 w-4" />
-                    <span>Copy path</span>
+                    <DocumentDuplicate class="h-4.5 w-4.5" />
+                    <span class="sr-only">Copy path</span>
                 </button>
             </div>
         </BubbleMenu>
