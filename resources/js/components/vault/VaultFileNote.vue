@@ -6,7 +6,6 @@ import { useTiptapPreferences } from '@/composables/useTiptapPreferences';
 import { useToast } from '@/composables/useToast';
 import { useVaultActions } from '@/composables/useVaultActions';
 import { imageFiles, useVaultImageUpload } from '@/composables/useVaultImageUpload';
-import DocumentDuplicate from '@/icons/DocumentDuplicate.vue';
 import { resolveServerVaultImagePath, resolveVaultImagePath } from '@/services/vault-image-path';
 import { useLayoutStore } from '@/stores/layout';
 import { VaultNode } from '@/types/vault';
@@ -275,23 +274,31 @@ onMounted(() => {
             :should-show="showImagePathMenu"
             :options="{
                 placement: 'top-end',
-                offset: { mainAxis: -40, crossAxis: -8 },
+                offset: { mainAxis: -24, crossAxis: -8 },
             }"
         >
-            <div
-                class="border-light-base-400/80 bg-light-base-50/90 dark:border-base-700/80 dark:bg-base-900/90 flex rounded-md border p-1 shadow-lg backdrop-blur-sm"
+            <button
+                type="button"
+                title="Copy server path"
+                aria-label="Copy server path"
+                class="text-light-base-700 dark:text-base-200 h-4 w-4 opacity-80 transition-opacity hover:opacity-100 focus:outline-none"
+                @click="copySelectedImagePath"
             >
-                <button
-                    type="button"
-                    title="Copy server path"
-                    aria-label="Copy server path"
-                    class="hover:bg-light-base-400 dark:hover:bg-base-700 flex h-8 w-8 items-center justify-center rounded transition-colors"
-                    @click="copySelectedImagePath"
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
                 >
-                    <DocumentDuplicate class="h-4 w-4" />
-                    <span class="sr-only">Copy server path</span>
-                </button>
-            </div>
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                </svg>
+                <span class="sr-only">Copy server path</span>
+            </button>
         </BubbleMenu>
 
         <div
