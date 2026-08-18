@@ -6,8 +6,12 @@ import { useTiptapPreferences } from '@/composables/useTiptapPreferences';
 import { useToast } from '@/composables/useToast';
 import { useVaultActions } from '@/composables/useVaultActions';
 import { imageFiles, useVaultImageUpload } from '@/composables/useVaultImageUpload';
+import DocumentDuplicate from '@/icons/DocumentDuplicate.vue';
+import { resolveVaultImagePath } from '@/services/vault-image-path';
 import { useLayoutStore } from '@/stores/layout';
 import { VaultNode } from '@/types/vault';
+import { Editor } from '@tiptap/core';
+import { BubbleMenu } from '@tiptap/vue-3/menus';
 import { inject, onMounted, ref, ShallowRef } from 'vue';
 
 interface VaultFileNodeProps {
@@ -82,6 +86,55 @@ const { editor, setContent, onMarkdownChanged } = useEditor({
     openFilePath: vaultActions.openFilePath,
     uploadImages,
 });
+
+function selectedImagePath(selectedEditor: Editor | null = editor.value): string | null {
+    if (!selectedEditor?.isActive('image')) {
+        return null;
+    }
+
+    return resolveVaultImagePath(selectedEditor.getAttributes('image').src, props.node.full_path);
+}
+
+function showImagePathMenu({ editor: selectedEditor }: { editor: Editor }): boolean {
+    return !isEditingMarkdown.value && selectedImagePath(selectedEditor) !== null;
+}
+
+async function writeClipboard(text: string): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(text);
+        return;
+    } catch {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.append(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        textarea.remove();
+
+        if (!copied) {
+            throw new Error('Unable to copy path');
+        }
+    }
+}
+
+async function copySelectedImagePath(): Promise<void> {
+    const path = selectedImagePath();
+
+    if (!path) {
+        createToast('This image does not have a local vault path', 'error');
+        return;
+    }
+
+    try {
+        await writeClipboard(path);
+        createToast('Image path copied', 'success');
+    } catch {
+        createToast('Unable to copy image path', 'error');
+    }
+}
 
 function caretOffset(element: HTMLElement): number {
     const selection = globalThis.getSelection();
@@ -202,6 +255,27 @@ onMounted(() => {
 
 <template>
     <div class="flex h-full w-full flex-col">
+        <BubbleMenu
+            v-if="editor"
+            :editor="editor"
+            :should-show="showImagePathMenu"
+            :options="{ placement: 'top', offset: 8 }"
+        >
+            <div
+                class="border-light-base-400 bg-light-base-50 dark:border-base-700 dark:bg-base-900 flex rounded border p-1 shadow-lg"
+            >
+                <button
+                    type="button"
+                    title="Copy vault path"
+                    class="hover:bg-light-base-400 dark:hover:bg-base-700 flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors"
+                    @click="copySelectedImagePath"
+                >
+                    <DocumentDuplicate class="h-4 w-4" />
+                    <span>Copy path</span>
+                </button>
+            </div>
+        </BubbleMenu>
+
         <div
             ref="noteEditorRef"
             class="h-full w-full px-4"

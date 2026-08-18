@@ -9,7 +9,7 @@ services:
                 UID: 1000
                 GID: 1000
                 VITE_REVERB_APP_KEY: ksr5j7y8po2d6n5j0vns
-        image: jcrewnote/many-notes:0.16.2-image-upload.5
+        image: jcrewnote/many-notes:0.16.2-image-upload.6
         restart: unless-stopped
         environment:
             APP_URL: https://jcrewnote.top

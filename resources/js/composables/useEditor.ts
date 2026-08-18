@@ -13,6 +13,7 @@ import { Editor } from '@tiptap/core';
 import { Table, TableRow } from '@tiptap/extension-table';
 import TaskItem from '@tiptap/extension-task-item';
 import TaskList from '@tiptap/extension-task-list';
+import { NodeSelection } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import { common, createLowlight } from 'lowlight';
 import { onMounted, onUnmounted, Ref, shallowRef, watch } from 'vue';
@@ -165,6 +166,20 @@ export function useEditor(options: SetupEditorOptions) {
             editorProps: {
                 attributes: {
                     class: 'h-full !max-w-none flow-root focus:outline-none prose dark:prose-invert',
+                },
+                handleClickOn(view, _position, node, nodePosition, _event, direct) {
+                    if (!direct || node.type.name !== 'image') {
+                        return false;
+                    }
+
+                    view.dispatch(
+                        view.state.tr.setSelection(
+                            NodeSelection.create(view.state.doc, nodePosition)
+                        )
+                    );
+                    view.focus();
+
+                    return true;
                 },
                 handlePaste(view, event) {
                     if (!options.isEditMode.value) {
