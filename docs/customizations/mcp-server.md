@@ -20,7 +20,6 @@ The server never exposes a document or file deletion tool.
 - `format_references`
 - `create_attachment_upload`
 - `complete_attachment_upload`
-- `upload_attachment`
 - `create_folder`
 - `create_document`
 - `update_document`
@@ -100,15 +99,10 @@ curl --fail-with-body --request PUT \
     "https://mcp.jcrewnote.top/mcp/attachment-uploads/UPLOAD_ID"
 ```
 
-`upload_attachment` remains available for clients that cannot perform the HTTP PUT. It accepts raw Base64 without a
-data-URL prefix, but its encoded bytes enter the tool arguments and are therefore less efficient. The decoded file may
-be at most 10 MiB. Both upload paths detect MIME type from the bytes, handle name collisions, and return a SHA-256
-digest plus the same safe `reference` object used by the read tools.
-
 Uploading is additive: it does not modify a Markdown document. For an image-backed note, create or locate an
 `attachments/images` folder beside the note, upload the image there, and then use `edit_document` with the returned
 `attachment.reference.recommended` value. This separation keeps document revision checks intact. Prefer
-`create_document` over Base64 when the intended input is authored Markdown text.
+`create_document` when the intended input is authored Markdown text.
 
 ## Manage tokens in the web interface
 

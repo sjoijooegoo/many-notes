@@ -19,7 +19,6 @@ use App\Mcp\Tools\RenameNodeTool;
 use App\Mcp\Tools\SearchDocumentsTool;
 use App\Mcp\Tools\SearchNodesTool;
 use App\Mcp\Tools\UpdateDocumentTool;
-use App\Mcp\Tools\UploadAttachmentTool;
 use Laravel\Mcp\Server;
 
 final class ManyNotesServer extends Server
@@ -36,7 +35,6 @@ final class ManyNotesServer extends Server
         Use each result's reference.recommended value or format_references; never invent vault paths.
         Prefer create_attachment_upload, stream the file bytes to its HTTP PUT URL, and then call
         complete_attachment_upload. This keeps binary content out of MCP arguments and model context.
-        Keep upload_attachment only as a compatibility fallback for clients that cannot perform the binary PUT.
         Insert the completed attachment's returned reference with edit_document.
         Internal references only resolve inside the same vault as the document being written.
         This server intentionally does not provide a document deletion capability.
@@ -52,7 +50,6 @@ final class ManyNotesServer extends Server
         FormatReferencesTool::class,
         CreateAttachmentUploadTool::class,
         CompleteAttachmentUploadTool::class,
-        UploadAttachmentTool::class,
         CreateFolderTool::class,
         CreateDocumentTool::class,
         UpdateDocumentTool::class,

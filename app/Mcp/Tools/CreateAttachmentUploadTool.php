@@ -26,8 +26,8 @@ final class CreateAttachmentUploadTool extends ManyNotesTool
 
     protected string $description =
         'Create a short-lived, one-time binary upload for an attachment. Send the local file bytes directly ' .
-        'to the returned HTTP PUT URL, then call complete_attachment_upload. Prefer this over upload_attachment ' .
-        'because the bytes never enter MCP tool arguments or model context.';
+        'to the returned HTTP PUT URL, then call complete_attachment_upload. The bytes never enter MCP tool ' .
+        'arguments or model context.';
 
     public function __construct(
         McpVaultAccess $access,
