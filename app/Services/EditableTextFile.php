@@ -6,7 +6,7 @@ namespace App\Services;
 
 final class EditableTextFile
 {
-    public const MAX_BYTES = 5 * 1024 * 1024;
+    public const int MAX_BYTES = 5 * 1024 * 1024;
 
     public static function read(string $path): ?string
     {

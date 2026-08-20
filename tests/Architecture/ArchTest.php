@@ -54,14 +54,14 @@ arch('avoid open for extension')
     ->classes()
     ->toBeFinal()
     ->ignoring([
-        'App\Mcp\Tools\ManyNotesTool',
+        App\Mcp\Tools\ManyNotesTool::class,
     ]);
 
 arch('avoid abstraction')
     ->expect('App')
     ->not->toBeAbstract()
     ->ignoring([
-        'App\Mcp\Tools\ManyNotesTool',
+        App\Mcp\Tools\ManyNotesTool::class,
         'App\Services\VaultFiles',
     ]);
 

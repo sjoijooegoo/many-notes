@@ -30,6 +30,13 @@ final readonly class McpVaultAccess
     {
         $user = $request->user();
 
+        return $user instanceof User && $this->token($request) instanceof PersonalAccessToken ? $user : null;
+    }
+
+    public function token(Request $request): ?PersonalAccessToken
+    {
+        $user = $request->user();
+
         if (!$user instanceof User) {
             return null;
         }
@@ -38,7 +45,7 @@ final readonly class McpVaultAccess
         /** @var mixed $accessToken */
         $accessToken = $user->currentAccessToken();
 
-        return $accessToken instanceof PersonalAccessToken ? $user : null;
+        return $accessToken instanceof PersonalAccessToken ? $accessToken : null;
     }
 
     public function vault(Request $request, int $vaultId, string $ability): ?Vault

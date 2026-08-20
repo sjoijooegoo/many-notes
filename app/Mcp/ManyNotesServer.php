@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
+use App\Mcp\Tools\CompleteAttachmentUploadTool;
+use App\Mcp\Tools\CreateAttachmentUploadTool;
 use App\Mcp\Tools\CreateDocumentTool;
 use App\Mcp\Tools\CreateFolderTool;
 use App\Mcp\Tools\EditDocumentTool;
@@ -24,7 +26,7 @@ final class ManyNotesServer extends Server
 {
     protected string $name = 'Many Notes';
 
-    protected string $version = '1.3.0';
+    protected string $version = '1.4.0';
 
     protected string $instructions = <<<'MARKDOWN'
         Read and manage Markdown documents in the user's authorized Many Notes vaults.
@@ -32,7 +34,10 @@ final class ManyNotesServer extends Server
         Prefer edit_document for small changes instead of uploading a complete Markdown document.
         Use search_nodes to discover documents and attachments that should be cited.
         Use each result's reference.recommended value or format_references; never invent vault paths.
-        Use upload_attachment for local or generated files, then insert its returned reference with edit_document.
+        Prefer create_attachment_upload, stream the file bytes to its HTTP PUT URL, and then call
+        complete_attachment_upload. This keeps binary content out of MCP arguments and model context.
+        Keep upload_attachment only as a compatibility fallback for clients that cannot perform the binary PUT.
+        Insert the completed attachment's returned reference with edit_document.
         Internal references only resolve inside the same vault as the document being written.
         This server intentionally does not provide a document deletion capability.
     MARKDOWN;
@@ -45,6 +50,8 @@ final class ManyNotesServer extends Server
         SearchDocumentsTool::class,
         SearchNodesTool::class,
         FormatReferencesTool::class,
+        CreateAttachmentUploadTool::class,
+        CompleteAttachmentUploadTool::class,
         UploadAttachmentTool::class,
         CreateFolderTool::class,
         CreateDocumentTool::class,

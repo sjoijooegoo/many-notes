@@ -18,6 +18,8 @@ The server never exposes a document or file deletion tool.
 - `search_documents`
 - `search_nodes`
 - `format_references`
+- `create_attachment_upload`
+- `complete_attachment_upload`
 - `upload_attachment`
 - `create_folder`
 - `create_document`
@@ -71,11 +73,37 @@ as missing, and internal Markdown references never cross vault boundaries.
 
 ## Uploading attachments
 
-Use `upload_attachment` to add one local or generated file to a writable vault. Pass the destination folder ID,
-the complete file name, and raw Base64 content without a data-URL prefix. The decoded file may be at most 10 MiB.
-The server validates the destination against the token's vault scope, detects the MIME type from the uploaded bytes,
-handles name collisions, stores the file in the normal vault filesystem, and returns its SHA-256 digest plus the same
-safe `reference` object used by the read tools.
+Prefer the direct binary flow for local or generated files. It keeps file bytes outside MCP JSON arguments and model
+context:
+
+1. Call `create_attachment_upload` with the writable vault ID, optional destination folder ID, complete file name,
+   exact byte count, and optionally the local SHA-256 digest.
+2. Stream the raw file bytes with HTTP `PUT` to the returned URL. Copy the returned `Authorization`, `Content-Type`,
+   and `Content-Length` headers exactly. Do not Base64-encode the request body.
+3. After HTTP `200`, call `complete_attachment_upload` with the returned upload ID.
+
+The upload URL and token are short-lived and single-purpose. Sessions expire after 10 minutes. The binary endpoint
+checks the one-time token, declared size, configured 10 MiB maximum, and optional SHA-256 digest while streaming to a
+temporary private file. The completion tool then rechecks the original MCP token, current vault write permission,
+destination folder, size, and digest before creating the normal vault attachment. Retrying the binary PUT or completion
+after a lost response is idempotent. Each MCP token may hold at most five active upload sessions, bounding abandoned
+temporary data even if a client repeatedly starts uploads without completing them.
+
+A generic direct upload looks like this; substitute values returned by `create_attachment_upload`:
+
+```bash
+curl --fail-with-body --request PUT \
+    --header "Authorization: Upload ONE_TIME_TOKEN" \
+    --header "Content-Type: application/octet-stream" \
+    --header "Content-Length: FILE_SIZE" \
+    --data-binary "@/absolute/path/to/file.png" \
+    "https://mcp.jcrewnote.top/mcp/attachment-uploads/UPLOAD_ID"
+```
+
+`upload_attachment` remains available for clients that cannot perform the HTTP PUT. It accepts raw Base64 without a
+data-URL prefix, but its encoded bytes enter the tool arguments and are therefore less efficient. The decoded file may
+be at most 10 MiB. Both upload paths detect MIME type from the bytes, handle name collisions, and return a SHA-256
+digest plus the same safe `reference` object used by the read tools.
 
 Uploading is additive: it does not modify a Markdown document. For an image-backed note, create or locate an
 `attachments/images` folder beside the note, upload the image there, and then use `edit_document` with the returned
@@ -153,6 +181,8 @@ secret manager when supported.
 
 ## Deployment boundary
 
-`MCP_HOST` controls the accepted MCP hostname. Caddy exposes only `/mcp` on that hostname and returns `404` for
-other paths. Laravel applies Sanctum authentication and request rate limiting before dispatching MCP requests;
-tool handlers then enforce both the token's vault abilities and the existing Many Notes vault policy.
+`MCP_HOST` controls the accepted MCP hostname. Caddy exposes `/mcp` and
+`/mcp/attachment-uploads/*` on that hostname and returns `404` for other paths. Laravel applies Sanctum authentication
+and request rate limiting before dispatching MCP requests; tool handlers then enforce both the token's vault abilities
+and the existing Many Notes vault policy. The binary endpoint accepts only its short-lived hashed upload token and is
+rate limited separately.

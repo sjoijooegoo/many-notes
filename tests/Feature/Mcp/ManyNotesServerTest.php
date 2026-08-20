@@ -7,6 +7,8 @@ use App\Actions\CreateVaultNode;
 use App\Actions\GetPathFromVaultNode;
 use App\Mcp\ManyNotesServer;
 use App\Mcp\Support\McpNodeReferenceFormatter;
+use App\Mcp\Tools\CompleteAttachmentUploadTool;
+use App\Mcp\Tools\CreateAttachmentUploadTool;
 use App\Mcp\Tools\CreateDocumentTool;
 use App\Mcp\Tools\EditDocumentTool;
 use App\Mcp\Tools\FormatReferencesTool;
@@ -18,8 +20,10 @@ use App\Mcp\Tools\RenameNodeTool;
 use App\Mcp\Tools\SearchNodesTool;
 use App\Mcp\Tools\UpdateDocumentTool;
 use App\Mcp\Tools\UploadAttachmentTool;
+use App\Models\McpAttachmentUpload;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Mcp\Server\Transport\FakeTransporter;
 
@@ -337,6 +341,153 @@ it('uploads an attachment and returns a safe Markdown reference', function (): v
     $path = new GetPathFromVaultNode()->handle($attachment);
 
     expect(Storage::disk('local')->get($path))->toBe($content);
+});
+
+it('uploads attachment bytes outside MCP arguments and completes the attachment idempotently', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, ['name' => 'Knowledge']);
+    $folder = new CreateVaultNode()->handle($vault, [
+        'is_file' => false,
+        'name' => 'attachments',
+    ]);
+    $token = $user->createToken('test', ["mcp:vault:{$vault->id}:write"]);
+    $user->withAccessToken($token->accessToken);
+    $content = base64_decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        true,
+    );
+    $uploadToken = str_repeat('u', 64);
+
+    expect($content)->toBeString();
+    Str::createRandomStringsUsing(fn(int $length): string => str_repeat('u', $length));
+
+    try {
+        ManyNotesServer::actingAs($user)
+            ->tool(CreateAttachmentUploadTool::class, [
+                'vault_id' => $vault->id,
+                'parent_id' => $folder->id,
+                'file_name' => 'direct.png',
+                'bytes' => mb_strlen($content, '8bit'),
+                'sha256' => hash('sha256', $content),
+            ])
+            ->assertOk()
+            ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+                ->where('upload.status', McpAttachmentUpload::PENDING)
+                ->where('upload.method', 'PUT')
+                ->where('upload.bytes', mb_strlen($content, '8bit'))
+                ->where('upload.next_tool', 'complete_attachment_upload')
+                ->where('instructions.1', 'Do not Base64-encode the body.')
+                ->etc());
+    } finally {
+        Str::createRandomStringsNormally();
+    }
+
+    $upload = McpAttachmentUpload::query()->sole();
+
+    $this->call(
+        'PUT',
+        'https://' . config('many_notes_mcp.host') . '/mcp/attachment-uploads/' . $upload->id,
+        server: [
+            'HTTP_HOST' => (string) config('many_notes_mcp.host'),
+            'HTTP_AUTHORIZATION' => 'Upload ' . $uploadToken,
+            'CONTENT_TYPE' => 'application/octet-stream',
+            'CONTENT_LENGTH' => (string) mb_strlen($content, '8bit'),
+        ],
+        content: $content,
+    )->assertOk()
+        ->assertJsonPath('upload.status', McpAttachmentUpload::UPLOADED)
+        ->assertJsonPath('upload.sha256', hash('sha256', $content))
+        ->assertJsonPath('upload.next_tool', 'complete_attachment_upload');
+
+    ManyNotesServer::actingAs($user)
+        ->tool(CompleteAttachmentUploadTool::class, [
+            'upload_id' => $upload->id,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+            ->where('upload.status', McpAttachmentUpload::COMPLETED)
+            ->where('upload.transport', 'direct_binary')
+            ->where('upload.idempotent', false)
+            ->where('attachment.path', '/attachments/direct.png')
+            ->where('attachment.reference.recommended', '![direct](/attachments/direct.png)')
+            ->where('bytes', mb_strlen($content, '8bit'))
+            ->where('sha256', hash('sha256', $content))
+            ->etc());
+
+    $attachment = $vault->nodes()->where('name', 'direct')->firstOrFail();
+    $path = new GetPathFromVaultNode()->handle($attachment);
+
+    expect(Storage::disk('local')->get($path))->toBe($content)
+        ->and(Storage::disk('local')->exists('mcp-attachment-uploads/' . $upload->id . '.upload'))
+        ->toBeFalse();
+
+    ManyNotesServer::actingAs($user)
+        ->tool(CompleteAttachmentUploadTool::class, [
+            'upload_id' => $upload->id,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+            ->where('upload.idempotent', true)
+            ->where('attachment.id', $attachment->id)
+            ->etc());
+});
+
+it('rejects invalid direct upload tokens and payload digests without creating an attachment', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, ['name' => 'Knowledge']);
+    $accessToken = $user->createToken('test', ["mcp:vault:{$vault->id}:write"]);
+    $content = 'expected bytes';
+    $uploadToken = str_repeat('s', 64);
+    $upload = McpAttachmentUpload::query()->create([
+        'personal_access_token_id' => $accessToken->accessToken->id,
+        'vault_id' => $vault->id,
+        'file_name' => 'invalid.bin',
+        'expected_bytes' => mb_strlen($content, '8bit'),
+        'expected_sha256' => str_repeat('0', 64),
+        'token_hash' => hash('sha256', $uploadToken),
+        'status' => McpAttachmentUpload::PENDING,
+        'expires_at' => now()->addMinutes(10),
+    ]);
+    $user->withAccessToken($accessToken->accessToken);
+    config()->set('many_notes_mcp.max_active_attachment_uploads_per_token', 1);
+
+    ManyNotesServer::actingAs($user)
+        ->tool(CreateAttachmentUploadTool::class, [
+            'vault_id' => $vault->id,
+            'file_name' => 'second.bin',
+            'bytes' => 1,
+        ])
+        ->assertHasErrors(['Complete or wait'])
+        ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+            ->where('error.code', 'too_many_active_uploads')
+            ->where('max_active_uploads', 1)
+            ->etc());
+
+    $server = [
+        'HTTP_HOST' => (string) config('many_notes_mcp.host'),
+        'CONTENT_TYPE' => 'application/octet-stream',
+        'CONTENT_LENGTH' => (string) mb_strlen($content, '8bit'),
+    ];
+
+    $this->call(
+        'PUT',
+        'https://' . config('many_notes_mcp.host') . '/mcp/attachment-uploads/' . $upload->id,
+        server: [...$server, 'HTTP_AUTHORIZATION' => 'Upload wrong-token'],
+        content: $content,
+    )->assertUnauthorized();
+
+    $this->call(
+        'PUT',
+        'https://' . config('many_notes_mcp.host') . '/mcp/attachment-uploads/' . $upload->id,
+        server: [...$server, 'HTTP_AUTHORIZATION' => 'Upload ' . $uploadToken],
+        content: $content,
+    )->assertUnprocessable()
+        ->assertJsonPath('error', 'Uploaded bytes do not match the declared SHA-256 digest.');
+
+    expect($upload->refresh()->status)->toBe(McpAttachmentUpload::PENDING)
+        ->and($vault->nodes()->where('is_file', true)->exists())->toBeFalse()
+        ->and(Storage::disk('local')->exists('mcp-attachment-uploads/' . $upload->id . '.upload'))
+        ->toBeFalse();
 });
 
 it('requires write access and a destination folder in the same vault when uploading an attachment', function (): void {
@@ -681,6 +832,12 @@ it('does not expose a deletion tool', function (): void {
     $toolNames = $server->createContext()->tools()->map->name()->all();
 
     expect($toolNames)
-        ->toContain('search_nodes', 'format_references', 'upload_attachment')
+        ->toContain(
+            'search_nodes',
+            'format_references',
+            'create_attachment_upload',
+            'complete_attachment_upload',
+            'upload_attachment',
+        )
         ->not->toContain('delete_document');
 });
