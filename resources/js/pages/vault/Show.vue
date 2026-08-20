@@ -41,13 +41,14 @@ import { formatElapsedTime, formatExtendedDate } from '@/utils/time';
 import { Head, router } from '@inertiajs/vue3';
 import { useEcho } from '@laravel/echo-vue';
 import { storeToRefs } from 'pinia';
-import { onMounted, provide, ref, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from 'vue';
 
 const props = defineProps<VaultShowPageProps>();
 
 const layoutStore = useLayoutStore();
-const { isLeftPanelOpen, isRightPanelOpen } = storeToRefs(layoutStore);
-const { toggleLeftPanel, toggleRightPanel, closePanels, syncPanelsWithScreen } = layoutStore;
+const { isLeftPanelOpen, isRightPanelOpen, leftPanelWidth } = storeToRefs(layoutStore);
+const { toggleLeftPanel, toggleRightPanel, closePanels, syncPanelsWithScreen, setLeftPanelWidth } =
+    layoutStore;
 const vaultStore = useVaultStore();
 const vaultRecentFileStore = useVaultRecentFileStore();
 const vaultOpenedFileStore = useVaultOpenedFileStore();
@@ -60,7 +61,126 @@ const { isSmallScreen } = useScreenSize();
 const vaultActions = useVaultActions();
 const vaultTreeActions = useVaultTreeActions();
 
+const LEFT_PANEL_DEFAULT_WIDTH = 300;
+const LEFT_PANEL_MIN_WIDTH = 240;
+const LEFT_PANEL_MAX_WIDTH = 600;
+const MAIN_SECTION_MIN_WIDTH = 360;
+
+const leftPanelRef = ref<HTMLElement | null>(null);
 const mainSectionRef = ref<HTMLElement | null>(null);
+const isResizingLeftPanel = ref(false);
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth);
+let resizeStartX = 0;
+let resizeStartWidth = 0;
+let previousBodyCursor = '';
+let previousBodyUserSelect = '';
+
+const rightPanelDesktopWidth = computed(() => {
+    if (!isRightPanelOpen.value) {
+        return 0;
+    }
+
+    return Math.min(300, Math.max(240, viewportWidth.value * 0.2));
+});
+const leftPanelMaxWidth = computed(() =>
+    Math.max(
+        LEFT_PANEL_MIN_WIDTH,
+        Math.min(
+            LEFT_PANEL_MAX_WIDTH,
+            viewportWidth.value - rightPanelDesktopWidth.value - MAIN_SECTION_MIN_WIDTH
+        )
+    )
+);
+const renderedLeftPanelWidth = computed(() =>
+    Math.min(Math.max(leftPanelWidth.value, LEFT_PANEL_MIN_WIDTH), leftPanelMaxWidth.value)
+);
+const leftPanelStyle = computed(() => {
+    if (isSmallScreen.value || !isLeftPanelOpen.value) {
+        return undefined;
+    }
+
+    const width = `${renderedLeftPanelWidth.value}px`;
+
+    return { width, minWidth: width };
+});
+
+function clampLeftPanelWidth(value: number): number {
+    return Math.min(Math.max(value, LEFT_PANEL_MIN_WIDTH), leftPanelMaxWidth.value);
+}
+
+function startLeftPanelResize(event: PointerEvent): void {
+    if (event.button !== 0 || isSmallScreen.value || !isLeftPanelOpen.value) {
+        return;
+    }
+
+    const handle = event.currentTarget as HTMLElement;
+
+    handle.setPointerCapture(event.pointerId);
+    resizeStartX = event.clientX;
+    resizeStartWidth = leftPanelRef.value?.getBoundingClientRect().width ?? leftPanelWidth.value;
+    isResizingLeftPanel.value = true;
+    previousBodyCursor = document.body.style.cursor;
+    previousBodyUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+}
+
+function resizeLeftPanel(event: PointerEvent): void {
+    if (!isResizingLeftPanel.value) {
+        return;
+    }
+
+    leftPanelWidth.value = clampLeftPanelWidth(resizeStartWidth + event.clientX - resizeStartX);
+}
+
+function finishLeftPanelResize(event?: PointerEvent): void {
+    if (!isResizingLeftPanel.value) {
+        return;
+    }
+
+    if (event) {
+        const handle = event.currentTarget as HTMLElement;
+
+        if (handle.hasPointerCapture(event.pointerId)) {
+            handle.releasePointerCapture(event.pointerId);
+        }
+    }
+
+    isResizingLeftPanel.value = false;
+    setLeftPanelWidth(leftPanelWidth.value);
+    document.body.style.cursor = previousBodyCursor;
+    document.body.style.userSelect = previousBodyUserSelect;
+}
+
+function resizeLeftPanelWithKeyboard(event: KeyboardEvent): void {
+    let width: number | null = null;
+
+    if (event.key === 'ArrowLeft') {
+        width = leftPanelWidth.value - 16;
+    } else if (event.key === 'ArrowRight') {
+        width = leftPanelWidth.value + 16;
+    } else if (event.key === 'Home') {
+        width = LEFT_PANEL_MIN_WIDTH;
+    } else if (event.key === 'End') {
+        width = leftPanelMaxWidth.value;
+    }
+
+    if (width === null) {
+        return;
+    }
+
+    event.preventDefault();
+    setLeftPanelWidth(clampLeftPanelWidth(width));
+}
+
+function resetLeftPanelWidth(): void {
+    setLeftPanelWidth(clampLeftPanelWidth(LEFT_PANEL_DEFAULT_WIDTH));
+}
+
+function updateViewportWidth(): void {
+    viewportWidth.value = window.innerWidth;
+}
+
 useContentWidthPreference(mainSectionRef);
 syncPanelsWithScreen(isSmallScreen.value);
 
@@ -92,6 +212,7 @@ const editorContext = shallowRef<ReturnType<typeof useEditor> | null>(null);
 provide('editorContext', editorContext);
 
 onMounted(() => {
+    window.addEventListener('resize', updateViewportWidth);
     vaultStore.setVault(props.vault);
     vaultRecentFileStore.setRecentFiles(props.recentFiles);
     vaultTreeStore.initializeVaultTree(
@@ -101,6 +222,11 @@ onMounted(() => {
         openedFile.value?.ancestorsChildren
     );
     vaultTemplateStore.setTemplates(props.templateNodes);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', updateViewportWidth);
+    finishLeftPanelResize();
 });
 
 watch(
@@ -277,13 +403,16 @@ useEcho<{ data: { user_id: number } }>(
         </Transition>
 
         <aside
-            class="bg-light-base-200 dark:bg-base-800 absolute top-0 bottom-0 left-0 z-30 w-[80%] max-w-[300px] overflow-y-auto rounded-r transition-all duration-300 ease-in-out lg:static lg:max-w-[300px] print:hidden"
+            ref="leftPanelRef"
+            class="bg-light-base-200 dark:bg-base-800 absolute top-0 bottom-0 left-0 z-30 w-[80%] max-w-[300px] overflow-y-auto rounded-r lg:static lg:max-w-none lg:shrink-0 print:hidden"
             :class="{
                 '-translate-x-full': isSmallScreen && !isLeftPanelOpen,
                 'translate-x-0': isSmallScreen && isLeftPanelOpen,
                 'lg:w-0 lg:min-w-0': !isLeftPanelOpen,
-                'lg:w-[20%] lg:min-w-[240px]': isLeftPanelOpen,
+                'transition-all duration-300 ease-in-out': !isResizingLeftPanel,
+                'transition-none': isResizingLeftPanel,
             }"
+            :style="leftPanelStyle"
         >
             <VaultTree
                 :vault-id="props.vault.id"
@@ -292,9 +421,36 @@ useEcho<{ data: { user_id: number } }>(
             />
         </aside>
 
+        <div
+            v-if="!isSmallScreen && isLeftPanelOpen"
+            class="group relative z-40 -mx-1 w-3 shrink-0 cursor-col-resize touch-none print:hidden"
+            role="separator"
+            aria-label="Resize file tree"
+            aria-orientation="vertical"
+            :aria-valuemin="LEFT_PANEL_MIN_WIDTH"
+            :aria-valuemax="leftPanelMaxWidth"
+            :aria-valuenow="Math.round(renderedLeftPanelWidth)"
+            tabindex="0"
+            title="Drag to resize; double-click to reset"
+            @pointerdown.prevent="startLeftPanelResize"
+            @pointermove="resizeLeftPanel"
+            @pointerup="finishLeftPanelResize"
+            @pointercancel="finishLeftPanelResize"
+            @keydown="resizeLeftPanelWithKeyboard"
+            @dblclick="resetLeftPanelWidth"
+        >
+            <span
+                class="bg-light-base-300 dark:bg-base-600 group-hover:bg-primary-500 group-focus:bg-primary-500 absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors"
+            ></span>
+        </div>
+
         <section
             ref="mainSectionRef"
-            class="h-full max-w-full flex-1 transition-all duration-300 ease-in-out"
+            class="h-full max-w-full flex-1"
+            :class="{
+                'transition-all duration-300 ease-in-out': !isResizingLeftPanel,
+                'transition-none': isResizingLeftPanel,
+            }"
         >
             <div
                 class="mx-auto flex h-full w-full flex-col transition-all duration-300 ease-in-out"

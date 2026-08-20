@@ -12,6 +12,12 @@ export const useLayoutStore = defineStore('layout', () => {
 
     const isLeftPanelOpen = ref<boolean>(false);
     const isRightPanelOpen = ref<boolean>(false);
+    const storedLeftPanelWidth = Number(localStorage.getItem('leftPanelWidth'));
+    const leftPanelWidth = ref<number>(
+        Number.isFinite(storedLeftPanelWidth) && storedLeftPanelWidth > 0
+            ? storedLeftPanelWidth
+            : 300
+    );
 
     const leftPanelPreferredOpen = ref<boolean>(
         localStorage.getItem('leftPanelPreferredOpen')
@@ -54,6 +60,11 @@ export const useLayoutStore = defineStore('layout', () => {
         isLeftPanelOpen.value = !isLeftPanelOpen.value;
     }
 
+    function setLeftPanelWidth(value: number) {
+        leftPanelWidth.value = Math.round(value);
+        localStorage.setItem('leftPanelWidth', leftPanelWidth.value.toString());
+    }
+
     function toggleRightPanel(isSmallScreen: boolean) {
         if (!isSmallScreen) {
             rightPanelPreferredOpen.value = !rightPanelPreferredOpen.value;
@@ -88,12 +99,14 @@ export const useLayoutStore = defineStore('layout', () => {
         showToggleContentWidthButton,
         isLeftPanelOpen,
         isRightPanelOpen,
+        leftPanelWidth,
         setAppLoading,
         setTreeViewLoading,
         setVaultNodeUpdating,
         setShowToggleContentWidthButton,
         toggleContentWidth,
         toggleLeftPanel,
+        setLeftPanelWidth,
         toggleRightPanel,
         closePanels,
         syncPanelsWithScreen,

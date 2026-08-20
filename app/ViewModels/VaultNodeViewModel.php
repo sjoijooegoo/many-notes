@@ -21,6 +21,7 @@ final readonly class VaultNodeViewModel
         public string $full_path,
         public string $url,
         public ?string $content,
+        public CarbonImmutable $created_at,
         public ?CarbonImmutable $updated_at,
     ) {
         //
@@ -43,6 +44,7 @@ final readonly class VaultNodeViewModel
             $fullPath,
             $url,
             $node->content,
+            $node->created_at,
             $node->updated_at,
         );
     }

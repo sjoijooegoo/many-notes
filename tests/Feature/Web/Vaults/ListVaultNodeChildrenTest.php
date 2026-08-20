@@ -15,7 +15,7 @@ it('lists the children of a folder', function (): void {
         'is_file' => false,
         'name' => fake()->words(3, true),
     ]);
-    new CreateVaultNode()->handle($vault, [
+    $file = new CreateVaultNode()->handle($vault, [
         'parent_id' => $folder->id,
         'is_file' => true,
         'name' => fake()->words(3, true),
@@ -32,6 +32,7 @@ it('lists the children of a folder', function (): void {
     );
 
     $response->assertStatus(200);
+    $response->assertJsonPath('children.0.created_at', $file->created_at->toJSON());
     expect($response->content())
         ->json()
         ->children

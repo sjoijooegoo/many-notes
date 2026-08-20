@@ -38,6 +38,7 @@ export interface VaultNode {
     full_path: string;
     url: string;
     content: string | null;
+    created_at: string;
     updated_at: string;
 }
 
@@ -52,6 +53,7 @@ export type VaultNodeTreeItem = Pick<
     | 'extension'
     | 'full_path'
     | 'url'
+    | 'created_at'
 >;
 
 export type VaultNodeTreeDropIndicator = {

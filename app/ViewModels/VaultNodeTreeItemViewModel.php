@@ -6,6 +6,7 @@ namespace App\ViewModels;
 
 use App\Actions\GetUrlFromVaultNode;
 use App\Models\VaultNode;
+use Carbon\CarbonImmutable;
 
 final readonly class VaultNodeTreeItemViewModel
 {
@@ -19,6 +20,7 @@ final readonly class VaultNodeTreeItemViewModel
         public ?string $extension,
         public string $full_path,
         public string $url,
+        public CarbonImmutable $created_at,
     ) {
         //
     }
@@ -39,6 +41,7 @@ final readonly class VaultNodeTreeItemViewModel
             $node->extension,
             $fullPath,
             $url,
+            $node->created_at,
         );
     }
 }

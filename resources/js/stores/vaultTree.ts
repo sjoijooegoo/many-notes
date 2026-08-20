@@ -189,6 +189,17 @@ export const useVaultTreeStore = defineStore('vaultTree', () => {
                 return firstNode.is_file ? 1 : -1;
             }
 
+            if (firstNode.is_file && secondNode.is_file) {
+                const createdAtDifference =
+                    Date.parse(firstNode.created_at) - Date.parse(secondNode.created_at);
+
+                if (!Number.isNaN(createdAtDifference) && createdAtDifference !== 0) {
+                    return createdAtDifference;
+                }
+
+                return firstNode.id - secondNode.id;
+            }
+
             return firstNode.name.localeCompare(secondNode.name);
         });
     }
