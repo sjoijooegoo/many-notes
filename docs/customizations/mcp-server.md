@@ -18,6 +18,7 @@ The server never exposes a document or file deletion tool.
 - `search_documents`
 - `search_nodes`
 - `format_references`
+- `upload_attachment`
 - `create_folder`
 - `create_document`
 - `update_document`
@@ -67,6 +68,19 @@ Use `format_references` to resolve up to 50 known node IDs again immediately bef
 embeds images and links other files; `link` always creates a normal link; `embed` is accepted only for images.
 Resolving by ID returns the current path after a move or rename. IDs outside the requested vault are reported only
 as missing, and internal Markdown references never cross vault boundaries.
+
+## Uploading attachments
+
+Use `upload_attachment` to add one local or generated file to a writable vault. Pass the destination folder ID,
+the complete file name, and raw Base64 content without a data-URL prefix. The decoded file may be at most 10 MiB.
+The server validates the destination against the token's vault scope, detects the MIME type from the uploaded bytes,
+handles name collisions, stores the file in the normal vault filesystem, and returns its SHA-256 digest plus the same
+safe `reference` object used by the read tools.
+
+Uploading is additive: it does not modify a Markdown document. For an image-backed note, create or locate an
+`attachments/images` folder beside the note, upload the image there, and then use `edit_document` with the returned
+`attachment.reference.recommended` value. This separation keeps document revision checks intact. Prefer
+`create_document` over Base64 when the intended input is authored Markdown text.
 
 ## Manage tokens in the web interface
 

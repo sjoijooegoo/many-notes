@@ -17,6 +17,7 @@ use App\Mcp\Tools\MoveNodeTool;
 use App\Mcp\Tools\RenameNodeTool;
 use App\Mcp\Tools\SearchNodesTool;
 use App\Mcp\Tools\UpdateDocumentTool;
+use App\Mcp\Tools\UploadAttachmentTool;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -291,6 +292,134 @@ it('optionally includes attachments in the recursive MCP tree', function (): voi
             ->etc());
 });
 
+it('uploads an attachment and returns a safe Markdown reference', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, ['name' => 'Knowledge']);
+    $folder = new CreateVaultNode()->handle($vault, [
+        'is_file' => false,
+        'name' => 'attachments',
+    ]);
+    $imageFolder = new CreateVaultNode()->handle($vault, [
+        'parent_id' => $folder->id,
+        'is_file' => false,
+        'name' => 'images',
+    ]);
+    $token = $user->createToken('test', ["mcp:vault:{$vault->id}:write"]);
+    $user->withAccessToken($token->accessToken);
+    $content = base64_decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        true,
+    );
+
+    expect($content)->toBeString();
+
+    ManyNotesServer::actingAs($user)
+        ->tool(UploadAttachmentTool::class, [
+            'vault_id' => $vault->id,
+            'parent_id' => $imageFolder->id,
+            'file_name' => '架构 图 (新版)#1.png',
+            'content_base64' => base64_encode($content),
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+            ->where('attachment.type', 'image')
+            ->where('attachment.mime_type', 'image/png')
+            ->where('attachment.path', '/attachments/images/架构 图 (新版)#1.png')
+            ->where(
+                'attachment.reference.recommended',
+                '![架构 图 (新版)#1](/attachments/images/架构%20图%20%28新版%29%231.png)',
+            )
+            ->where('bytes', mb_strlen($content, '8bit'))
+            ->where('sha256', hash('sha256', $content))
+            ->etc());
+
+    $attachment = $vault->nodes()->where('name', '架构 图 (新版)#1')->firstOrFail();
+    $path = new GetPathFromVaultNode()->handle($attachment);
+
+    expect(Storage::disk('local')->get($path))->toBe($content);
+});
+
+it('requires write access and a destination folder in the same vault when uploading an attachment', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, ['name' => 'Knowledge']);
+    $otherVault = new CreateVault()->handle($user, ['name' => 'Other']);
+    $otherFolder = new CreateVaultNode()->handle($otherVault, [
+        'is_file' => false,
+        'name' => 'attachments',
+    ]);
+    $readToken = $user->createToken('read', ["mcp:vault:{$vault->id}:read"]);
+    $user->withAccessToken($readToken->accessToken);
+
+    ManyNotesServer::actingAs($user)
+        ->tool(UploadAttachmentTool::class, [
+            'vault_id' => $vault->id,
+            'file_name' => 'read-only.txt',
+            'content_base64' => base64_encode('not allowed'),
+        ])
+        ->assertHasErrors(['Access denied']);
+
+    $writeToken = $user->createToken('write', ["mcp:vault:{$vault->id}:write"]);
+    $user->withAccessToken($writeToken->accessToken);
+
+    ManyNotesServer::actingAs($user)
+        ->tool(UploadAttachmentTool::class, [
+            'vault_id' => $vault->id,
+            'parent_id' => $otherFolder->id,
+            'file_name' => 'wrong-vault.txt',
+            'content_base64' => base64_encode('not allowed'),
+        ])
+        ->assertHasErrors(['Parent folder not found']);
+
+    expect($vault->nodes()->where('is_file', true)->exists())->toBeFalse()
+        ->and($otherVault->nodes()->where('is_file', true)->exists())->toBeFalse();
+});
+
+it('rejects malformed attachment input without creating a file', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, ['name' => 'Knowledge']);
+    $token = $user->createToken('test', ["mcp:vault:{$vault->id}:write"]);
+    $user->withAccessToken($token->accessToken);
+
+    ManyNotesServer::actingAs($user)
+        ->tool(UploadAttachmentTool::class, [
+            'vault_id' => $vault->id,
+            'file_name' => '../secret.txt',
+            'content_base64' => base64_encode('secret'),
+        ])
+        ->assertHasErrors(['valid single path segment'])
+        ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+            ->where('error.code', 'invalid_file_name')
+            ->etc());
+
+    ManyNotesServer::actingAs($user)
+        ->tool(UploadAttachmentTool::class, [
+            'vault_id' => $vault->id,
+            'file_name' => 'broken.png',
+            'content_base64' => 'not-base64!',
+        ])
+        ->assertHasErrors(['not valid Base64'])
+        ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+            ->where('error.code', 'invalid_base64')
+            ->etc());
+
+    config()->set('many_notes_mcp.max_attachment_bytes', 4);
+    $tooLarge = '12345';
+
+    ManyNotesServer::actingAs($user)
+        ->tool(UploadAttachmentTool::class, [
+            'vault_id' => $vault->id,
+            'file_name' => 'too-large.bin',
+            'content_base64' => base64_encode($tooLarge),
+        ])
+        ->assertHasErrors(['exceeds the configured maximum'])
+        ->assertStructuredContent(fn(AssertableJson $json): AssertableJson => $json
+            ->where('error.code', 'invalid_attachment_size')
+            ->where('max_bytes', 4)
+            ->etc());
+
+    expect($vault->nodes()->where('is_file', true)->exists())->toBeFalse();
+});
+
 it('does not allow a read-only token to create documents', function (): void {
     $user = User::factory()->create();
     $vault = new CreateVault()->handle($user, ['name' => 'Knowledge']);
@@ -552,6 +681,6 @@ it('does not expose a deletion tool', function (): void {
     $toolNames = $server->createContext()->tools()->map->name()->all();
 
     expect($toolNames)
-        ->toContain('search_nodes', 'format_references')
+        ->toContain('search_nodes', 'format_references', 'upload_attachment')
         ->not->toContain('delete_document');
 });

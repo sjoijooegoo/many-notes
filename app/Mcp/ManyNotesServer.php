@@ -17,13 +17,14 @@ use App\Mcp\Tools\RenameNodeTool;
 use App\Mcp\Tools\SearchDocumentsTool;
 use App\Mcp\Tools\SearchNodesTool;
 use App\Mcp\Tools\UpdateDocumentTool;
+use App\Mcp\Tools\UploadAttachmentTool;
 use Laravel\Mcp\Server;
 
 final class ManyNotesServer extends Server
 {
     protected string $name = 'Many Notes';
 
-    protected string $version = '1.2.0';
+    protected string $version = '1.3.0';
 
     protected string $instructions = <<<'MARKDOWN'
         Read and manage Markdown documents in the user's authorized Many Notes vaults.
@@ -31,6 +32,7 @@ final class ManyNotesServer extends Server
         Prefer edit_document for small changes instead of uploading a complete Markdown document.
         Use search_nodes to discover documents and attachments that should be cited.
         Use each result's reference.recommended value or format_references; never invent vault paths.
+        Use upload_attachment for local or generated files, then insert its returned reference with edit_document.
         Internal references only resolve inside the same vault as the document being written.
         This server intentionally does not provide a document deletion capability.
     MARKDOWN;
@@ -43,6 +45,7 @@ final class ManyNotesServer extends Server
         SearchDocumentsTool::class,
         SearchNodesTool::class,
         FormatReferencesTool::class,
+        UploadAttachmentTool::class,
         CreateFolderTool::class,
         CreateDocumentTool::class,
         UpdateDocumentTool::class,
