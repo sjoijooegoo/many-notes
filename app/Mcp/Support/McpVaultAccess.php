@@ -21,6 +21,11 @@ final readonly class McpVaultAccess
 
     public const string READ_ALL_VISIBLE_ABILITY = 'mcp:vaults:read';
 
+    public function __construct(private McpNodeReferenceFormatter $references)
+    {
+        //
+    }
+
     public function user(Request $request): ?User
     {
         $user = $request->user();
@@ -122,19 +127,31 @@ final readonly class McpVaultAccess
     /** @return array<string, mixed> */
     public function nodeData(VaultNode $node): array
     {
+        $type = $this->references->type($node);
         $data = [
             'id' => $node->id,
             'vault_id' => $node->vault_id,
             'parent_id' => $node->parent_id,
-            'kind' => $node->is_file ? 'document' : 'folder',
+            'kind' => match ($type) {
+                'folder' => 'folder',
+                'document' => 'document',
+                default => 'file',
+            },
+            'type' => $type,
             'name' => $node->name,
-            'path' => '/' . $node->fullPath() . ($node->is_file ? '.md' : ''),
+            'extension' => $node->extension,
+            'mime_type' => $node->mime_type,
+            'path' => $this->references->path($node),
             'revision' => $node->revision,
             'updated_at' => $node->updated_at->toIso8601String(),
         ];
 
         if ($node->is_file) {
-            $data['content_hash'] = hash('sha256', $node->content ?? '');
+            $data['reference'] = $this->references->reference($node);
+
+            if ($node->content !== null) {
+                $data['content_hash'] = hash('sha256', $node->content);
+            }
         }
 
         return $data;

@@ -23,6 +23,7 @@ final class ListTreeTool extends ManyNotesTool
 
     protected string $description =
         'Recursively list folders and Markdown documents below a folder as bounded flat tree entries. ' .
+        'Set include_files to include every attachment type and ready-to-paste Markdown references. ' .
         'Each entry includes parent_id, depth, path, and revision.';
 
     #[Override]
@@ -39,6 +40,8 @@ final class ListTreeTool extends ManyNotesTool
                 ->min(1)
                 ->max(500)
                 ->description('Maximum entries returned. Defaults to 200.'),
+            'include_files' => $schema->boolean()
+                ->description('Include text, images, PDFs, media, and other attachments. Defaults to false.'),
         ];
     }
 
@@ -49,6 +52,7 @@ final class ListTreeTool extends ManyNotesTool
             'root_folder_id' => ['nullable', 'integer'],
             'max_depth' => ['nullable', 'integer', 'between:1,10'],
             'max_nodes' => ['nullable', 'integer', 'between:1,500'],
+            'include_files' => ['nullable', 'boolean'],
         ]);
         $vault = $this->authorizedVault($request, $this->intValue($data, 'vault_id'), McpVaultAccess::READ);
 
@@ -65,6 +69,7 @@ final class ListTreeTool extends ManyNotesTool
 
         $maxDepth = $this->nullableIntValue($data, 'max_depth') ?? 5;
         $maxNodes = $this->nullableIntValue($data, 'max_nodes') ?? 200;
+        $includeFiles = (bool) ($data['include_files'] ?? false);
         $frontier = $rootFolderId === null ? [] : [$rootFolderId];
         $paths = $root instanceof VaultNode ? [$root->id => '/' . $root->fullPath()] : [];
         $entries = [];
@@ -77,11 +82,8 @@ final class ListTreeTool extends ManyNotesTool
             if ($remaining === 0) {
                 $truncated = $frontier !== [] && $vault->nodes()
                     ->whereIn('parent_id', $frontier)
-                    ->where(function (Builder $query): void {
-                        $query->where('is_file', false)
-                            ->orWhere(function (Builder $query): void {
-                                $query->where('is_file', true)->where('extension', 'md');
-                            });
+                    ->where(function (Builder $query) use ($includeFiles): void {
+                        $this->includeableNodes($query, $includeFiles);
                     })
                     ->exists();
 
@@ -94,11 +96,8 @@ final class ListTreeTool extends ManyNotesTool
                     fn(Builder $query): Builder => $query->whereNull('parent_id'),
                     fn(Builder $query): Builder => $query->whereIn('parent_id', $frontier),
                 )
-                ->where(function (Builder $query): void {
-                    $query->where('is_file', false)
-                        ->orWhere(function (Builder $query): void {
-                            $query->where('is_file', true)->where('extension', 'md');
-                        });
+                ->where(function (Builder $query) use ($includeFiles): void {
+                    $this->includeableNodes($query, $includeFiles);
                 })
                 ->orderBy('is_file')
                 ->orderBy('name')
@@ -114,21 +113,15 @@ final class ListTreeTool extends ManyNotesTool
 
             foreach ($nodes as $node) {
                 $parentPath = $node->parent_id === null ? '' : ($paths[$node->parent_id] ?? '');
-                $path = $parentPath . '/' . $node->name . ($node->is_file ? '.md' : '');
+                $extension = $node->is_file && $node->extension ? ".{$node->extension}" : '';
+                $path = $parentPath . '/' . $node->name . $extension;
                 $entry = [
-                    'id' => $node->id,
-                    'parent_id' => $node->parent_id,
+                    ...$this->access->nodeData($node),
                     'depth' => $depth,
-                    'kind' => $node->is_file ? 'document' : 'folder',
-                    'name' => $node->name,
                     'path' => $path,
-                    'revision' => $node->revision,
-                    'updated_at' => $node->updated_at->toIso8601String(),
                 ];
 
-                if ($node->is_file) {
-                    $entry['content_hash'] = hash('sha256', $node->content ?? '');
-                } else {
+                if (!$node->is_file) {
                     $paths[$node->id] = $path;
                     $nextFrontier[] = $node->id;
                 }
@@ -145,11 +138,8 @@ final class ListTreeTool extends ManyNotesTool
             if ($depth === $maxDepth) {
                 $depthLimited = $vault->nodes()
                     ->whereIn('parent_id', $frontier)
-                    ->where(function (Builder $query): void {
-                        $query->where('is_file', false)
-                            ->orWhere(function (Builder $query): void {
-                                $query->where('is_file', true)->where('extension', 'md');
-                            });
+                    ->where(function (Builder $query) use ($includeFiles): void {
+                        $this->includeableNodes($query, $includeFiles);
                     })
                     ->exists();
             }
@@ -162,8 +152,22 @@ final class ListTreeTool extends ManyNotesTool
             'returned' => count($entries),
             'max_depth' => $maxDepth,
             'max_nodes' => $maxNodes,
+            'include_files' => $includeFiles,
             'truncated' => $truncated,
             'depth_limited' => $depthLimited,
         ]);
+    }
+
+    /** @param Builder<VaultNode> $query */
+    private function includeableNodes(Builder $query, bool $includeFiles): void
+    {
+        $query->where('is_file', false)
+            ->orWhere(function (Builder $query) use ($includeFiles): void {
+                $query->where('is_file', true);
+
+                if (!$includeFiles) {
+                    $query->where('extension', 'md');
+                }
+            });
     }
 }

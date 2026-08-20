@@ -16,6 +16,8 @@ The server never exposes a document or file deletion tool.
 - `list_tree`
 - `get_document`
 - `search_documents`
+- `search_nodes`
+- `format_references`
 - `create_folder`
 - `create_document`
 - `update_document`
@@ -37,8 +39,34 @@ latest document or node metadata. The latest Markdown content is included up to 
 include a bounded preview and can be fetched with `get_document` before retrying.
 
 `list_tree` recursively lists at most 500 folders and Markdown documents, with a configurable depth of at most
-10. `rename_node` and `move_node` work only on folders and Markdown documents. Moving a folder into itself or one
-of its descendants is rejected by the server. No move, rename, or edit operation exposes deletion.
+10. Pass `include_files: true` to include editable text, images, PDFs, media, and arbitrary attachments. Existing
+clients retain the Markdown-only behavior when this input is omitted. `rename_node` and `move_node` work only on
+folders and Markdown documents. Moving a folder into itself or one of its descendants is rejected by the server.
+No move, rename, or edit operation exposes deletion.
+
+## Referencing documents and attachments
+
+Use `search_nodes` when an AI needs to cite an existing document or attachment. It searches names across every
+file type and searchable content in Markdown or editable text files. Results are bounded and can be filtered by
+node type and a vault-absolute `path_prefix`. Every file result contains a server-generated `reference` object:
+
+```json
+{
+  "path": "/Project/attachments/images/Diagram.png",
+  "link": "[Diagram](/Project/attachments/images/Diagram.png)",
+  "embed": "![Diagram](/Project/attachments/images/Diagram.png)",
+  "recommended": "![Diagram](/Project/attachments/images/Diagram.png)"
+}
+```
+
+Only images have an `embed` value. The recommended form embeds images and creates a normal link for every other
+file. Paths with spaces or Markdown-significant punctuation are escaped by the server, so clients should use the
+returned Markdown instead of constructing it themselves.
+
+Use `format_references` to resolve up to 50 known node IDs again immediately before writing. Its `auto` style
+embeds images and links other files; `link` always creates a normal link; `embed` is accepted only for images.
+Resolving by ID returns the current path after a move or rename. IDs outside the requested vault are reported only
+as missing, and internal Markdown references never cross vault boundaries.
 
 ## Manage tokens in the web interface
 
