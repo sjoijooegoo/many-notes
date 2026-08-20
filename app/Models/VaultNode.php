@@ -31,6 +31,7 @@ use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
  * @property-read string $extension
  * @property-read string $full_path
  * @property-read string|null $content
+ * @property int $revision
  * @property-read CarbonImmutable $created_at
  * @property-read CarbonImmutable $updated_at
  * @property-read Vault $vault
@@ -138,10 +139,30 @@ final class VaultNode extends Model
     }
 
     #[Override]
+    protected static function booted(): void
+    {
+        self::creating(function (self $node): void {
+            $node->revision ??= 1;
+        });
+
+        self::updating(function (self $node): void {
+            if (!$node->isDirty('revision')) {
+                $originalRevision = $node->getOriginal('revision');
+                $node->revision = match (true) {
+                    is_int($originalRevision) => $originalRevision + 1,
+                    is_string($originalRevision) && ctype_digit($originalRevision) => (int) $originalRevision + 1,
+                    default => 1,
+                };
+            }
+        });
+    }
+
+    #[Override]
     protected function casts(): array
     {
         return [
             'is_file' => 'boolean',
+            'revision' => 'integer',
         ];
     }
 }

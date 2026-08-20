@@ -7,11 +7,13 @@ namespace App\Mcp\Tools;
 use App\Mcp\Support\McpVaultAccess;
 use App\Models\VaultNode;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Override;
 
 #[IsReadOnly]
 #[IsOpenWorld(false)]
@@ -21,6 +23,7 @@ final class ListDocumentsTool extends ManyNotesTool
 
     protected string $description = 'List folders and Markdown documents directly inside one Many Notes folder.';
 
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [
@@ -56,9 +59,9 @@ final class ListDocumentsTool extends ManyNotesTool
         $limit = $this->nullableIntValue($data, 'limit') ?? 50;
         $nodes = $vault->nodes()
             ->where('parent_id', $parentId)
-            ->where(function ($query): void {
+            ->where(function (Builder $query): void {
                 $query->where('is_file', false)
-                    ->orWhere(function ($query): void {
+                    ->orWhere(function (Builder $query): void {
                         $query->where('is_file', true)->where('extension', 'md');
                     });
             })
@@ -71,14 +74,7 @@ final class ListDocumentsTool extends ManyNotesTool
 
         $entries = $nodes
             ->take($limit)
-            ->map(fn(VaultNode $node): array => [
-                'id' => $node->id,
-                'parent_id' => $node->parent_id,
-                'kind' => $node->is_file ? 'document' : 'folder',
-                'name' => $node->name,
-                'path' => '/' . $node->fullPath() . ($node->is_file ? '.md' : ''),
-                'updated_at' => $node->updated_at->toIso8601String(),
-            ])
+            ->map(fn(VaultNode $node): array => $this->access->nodeData($node))
             ->values()
             ->all();
 

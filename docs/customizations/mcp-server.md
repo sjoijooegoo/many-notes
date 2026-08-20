@@ -13,14 +13,32 @@ The server never exposes a document or file deletion tool.
 
 - `list_vaults`
 - `list_documents`
+- `list_tree`
 - `get_document`
 - `search_documents`
 - `create_folder`
 - `create_document`
 - `update_document`
+- `edit_document`
+- `rename_node`
+- `move_node`
 
-Updates use optimistic concurrency control: call `get_document` first, then pass its `updated_at` value as
-`expected_updated_at`. The update is rejected if another client changed the document in the meantime.
+Updates use optimistic concurrency control. Read or list a node first, then pass its integer `revision` value as
+`expected_revision`. `get_document` also returns a SHA-256 `content_hash`. The older `expected_updated_at` input
+remains accepted by `update_document` for existing clients.
+
+`edit_document` avoids sending a complete long document for small changes. Its `exact_text` mode replaces one
+unique old text block and can safely rebase the edit when an unrelated concurrent change occurred. Its
+`heading_section` mode replaces the body below one unique Markdown heading; headings inside fenced code blocks
+are ignored. A stale heading edit is rejected because the complete old section is not present in the request.
+
+Version conflicts are MCP errors with structured content. They include `error.code = version_conflict` and the
+latest document or node metadata. The latest Markdown content is included up to 200,000 characters; larger documents
+include a bounded preview and can be fetched with `get_document` before retrying.
+
+`list_tree` recursively lists at most 500 folders and Markdown documents, with a configurable depth of at most
+10. `rename_node` and `move_node` work only on folders and Markdown documents. Moving a folder into itself or one
+of its descendants is rejected by the server. No move, rename, or edit operation exposes deletion.
 
 ## Manage tokens in the web interface
 

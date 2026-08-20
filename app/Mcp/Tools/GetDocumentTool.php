@@ -11,6 +11,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Override;
 
 #[IsReadOnly]
 #[IsOpenWorld(false)]
@@ -18,8 +19,10 @@ final class GetDocumentTool extends ManyNotesTool
 {
     protected string $name = 'get_document';
 
-    protected string $description = 'Read one Markdown document and return its content and current updated_at version.';
+    protected string $description =
+        'Read one Markdown document and return its content, revision, content hash, and updated_at timestamp.';
 
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [

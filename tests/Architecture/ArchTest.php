@@ -24,6 +24,7 @@ arch('avoid mutation')
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
+        'App\Mcp',
         'App\Models',
         'App\Notifications',
         'App\Providers',
@@ -41,6 +42,7 @@ arch('avoid inheritance')
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
+        'App\Mcp',
         'App\Models',
         'App\Notifications',
         'App\Providers',
@@ -50,12 +52,16 @@ arch('avoid inheritance')
 arch('avoid open for extension')
     ->expect('App')
     ->classes()
-    ->toBeFinal();
+    ->toBeFinal()
+    ->ignoring([
+        'App\Mcp\Tools\ManyNotesTool',
+    ]);
 
 arch('avoid abstraction')
     ->expect('App')
     ->not->toBeAbstract()
     ->ignoring([
+        'App\Mcp\Tools\ManyNotesTool',
         'App\Services\VaultFiles',
     ]);
 
@@ -76,6 +82,7 @@ arch('models')
         'App\Events',
         'App\Http',
         'App\Jobs',
+        'App\Mcp',
         'App\Models',
         'App\Notifications',
         'App\Observers',

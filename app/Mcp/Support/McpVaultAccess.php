@@ -8,17 +8,18 @@ use App\Models\User;
 use App\Models\Vault;
 use App\Models\VaultNode;
 use App\Queries\Vaults\VisibleVaultsQuery;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Laravel\Mcp\Request;
 use Laravel\Sanctum\PersonalAccessToken;
 
 final readonly class McpVaultAccess
 {
-    public const READ = 'read';
+    public const string READ = 'read';
 
-    public const WRITE = 'write';
+    public const string WRITE = 'write';
 
-    public const READ_ALL_VISIBLE_ABILITY = 'mcp:vaults:read';
+    public const string READ_ALL_VISIBLE_ABILITY = 'mcp:vaults:read';
 
     public function user(Request $request): ?User
     {
@@ -59,7 +60,7 @@ final readonly class McpVaultAccess
     {
         $user = $this->user($request);
 
-        if (!$user) {
+        if (!$user instanceof User) {
             return new Collection();
         }
 
@@ -81,6 +82,19 @@ final readonly class McpVaultAccess
             ->first();
     }
 
+    public function node(Vault $vault, int $nodeId): ?VaultNode
+    {
+        return $vault->nodes()
+            ->whereKey($nodeId)
+            ->where(function (Builder $query): void {
+                $query->where('is_file', false)
+                    ->orWhere(function (Builder $query): void {
+                        $query->where('is_file', true)->where('extension', 'md');
+                    });
+            })
+            ->first();
+    }
+
     public function folder(Vault $vault, ?int $folderId): ?VaultNode
     {
         if ($folderId === null) {
@@ -93,20 +107,34 @@ final readonly class McpVaultAccess
             ->first();
     }
 
-    /** @return array<string, int|string|null> */
+    /** @return array<string, mixed> */
     public function documentData(VaultNode $node, bool $includeContent = true): array
+    {
+        $data = $this->nodeData($node);
+
+        if ($includeContent) {
+            $data['content'] = $node->content ?? '';
+        }
+
+        return $data;
+    }
+
+    /** @return array<string, mixed> */
+    public function nodeData(VaultNode $node): array
     {
         $data = [
             'id' => $node->id,
             'vault_id' => $node->vault_id,
             'parent_id' => $node->parent_id,
+            'kind' => $node->is_file ? 'document' : 'folder',
             'name' => $node->name,
-            'path' => '/' . $node->fullPath() . '.md',
+            'path' => '/' . $node->fullPath() . ($node->is_file ? '.md' : ''),
+            'revision' => $node->revision,
             'updated_at' => $node->updated_at->toIso8601String(),
         ];
 
-        if ($includeContent) {
-            $data['content'] = $node->content ?? '';
+        if ($node->is_file) {
+            $data['content_hash'] = hash('sha256', $node->content ?? '');
         }
 
         return $data;

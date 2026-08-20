@@ -12,6 +12,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Override;
 
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]
@@ -27,6 +28,7 @@ final class CreateFolderTool extends ManyNotesTool
         parent::__construct($access);
     }
 
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [
@@ -62,14 +64,6 @@ final class CreateFolderTool extends ManyNotesTool
             'name' => mb_trim($this->stringValue($data, 'name')),
         ]);
 
-        return Response::structured([
-            'folder' => [
-                'id' => $folder->id,
-                'vault_id' => $folder->vault_id,
-                'parent_id' => $folder->parent_id,
-                'name' => $folder->name,
-                'path' => '/' . $folder->fullPath(),
-            ],
-        ]);
+        return Response::structured(['folder' => $this->access->nodeData($folder)]);
     }
 }

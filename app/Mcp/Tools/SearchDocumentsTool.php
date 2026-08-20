@@ -7,12 +7,14 @@ namespace App\Mcp\Tools;
 use App\Mcp\Support\McpVaultAccess;
 use App\Models\VaultNode;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Override;
 
 #[IsReadOnly]
 #[IsOpenWorld(false)]
@@ -23,6 +25,7 @@ final class SearchDocumentsTool extends ManyNotesTool
     protected string $description =
         'Search Markdown document names and content inside one authorized Many Notes vault.';
 
+    #[Override]
     public function schema(JsonSchema $schema): array
     {
         return [
@@ -51,7 +54,7 @@ final class SearchDocumentsTool extends ManyNotesTool
         $documents = $vault->nodes()
             ->where('is_file', true)
             ->where('extension', 'md')
-            ->where(function ($builder) use ($escapedQuery): void {
+            ->where(function (Builder $builder) use ($escapedQuery): void {
                 $builder->where('name', 'like', "%{$escapedQuery}%")
                     ->orWhere('content', 'like', "%{$escapedQuery}%");
             })

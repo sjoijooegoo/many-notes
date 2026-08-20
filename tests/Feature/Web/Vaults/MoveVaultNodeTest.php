@@ -211,6 +211,29 @@ it('does not move a node to be its own parent', function (): void {
     $response->assertStatus(422);
 });
 
+it('does not move a folder inside one of its descendants', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, ['name' => 'vault']);
+    $folder = new CreateVaultNode()->handle($vault, [
+        'is_file' => false,
+        'name' => 'parent',
+    ]);
+    $child = new CreateVaultNode()->handle($vault, [
+        'parent_id' => $folder->id,
+        'is_file' => false,
+        'name' => 'child',
+    ]);
+
+    $this->actingAs($user)
+        ->patch(
+            route('vaults.nodes.move', ['vault' => $vault->id, 'node' => $folder->id]),
+            ['parent_id' => $child->id],
+        )
+        ->assertUnprocessable();
+
+    expect($folder->refresh()->parent_id)->toBeNull();
+});
+
 it('does not move a node to be a child of a non-existing folder', function (): void {
     $user = User::factory()->create();
     $vault = new CreateVault()->handle($user, [

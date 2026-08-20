@@ -24,6 +24,7 @@ it('has valid schema', function (): void {
             'content',
             'created_at',
             'updated_at',
+            'revision',
         ]);
 });
 

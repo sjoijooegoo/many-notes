@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Actions\UpdateVaultNode;
+use App\Actions\MoveVaultNode;
+use App\Exceptions\InvalidVaultNodeMove;
 use App\Http\Requests\MoveVaultNodeRequest;
 use App\Models\User;
 use App\Models\Vault;
@@ -26,17 +27,11 @@ final readonly class VaultNodeMoveController
         /** @var array{ parent_id: int|null } $data */
         $data = $request->validated();
 
-        abort_if($node->id === $data['parent_id'], 422, 'A node cannot be its own parent');
-
-        if ($data['parent_id']) {
-            $parent = $vault->nodes()->where('id', $data['parent_id'])->first();
-
-            abort_if(!$parent, 404, 'Parent node not found');
-
-            abort_if($parent->is_file, 422, 'Parent node cannot be a file');
+        try {
+            $updatedNode = app(MoveVaultNode::class)->handle($node, $data['parent_id']);
+        } catch (InvalidVaultNodeMove $exception) {
+            abort($exception->httpStatus(), $exception->getMessage());
         }
-
-        $updatedNode = app(UpdateVaultNode::class)->handle($node, $data);
 
         return response()->json([
             'data' => VaultNodeViewModel::fromModel($updatedNode),

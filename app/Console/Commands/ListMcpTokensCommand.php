@@ -30,7 +30,7 @@ final class ListMcpTokensCommand extends Command
             ->map(fn(PersonalAccessToken $token): array => [
                 $token->id,
                 $token->name,
-                implode(', ', array_filter($token->abilities ?? [], 'is_string')),
+                implode(', ', array_filter($token->abilities ?? [], is_string(...))),
                 $token->last_used_at?->toIso8601String() ?? 'never',
                 $token->expires_at?->toIso8601String() ?? 'never',
             ])

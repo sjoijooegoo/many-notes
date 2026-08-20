@@ -7,6 +7,7 @@ namespace App\Actions;
 use App\Events\VaultNodeUpdatedEvent;
 use App\Events\VaultOpenedFileDataUpdatedEvent;
 use App\Events\VaultTagListUpdatedEvent;
+use App\Exceptions\VaultNodeVersionConflict;
 use App\Models\VaultNode;
 use App\Services\VaultFiles\Types\Note;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +21,7 @@ final readonly class UpdateVaultNode
      *   content?: string|null,
      * } $attributes
      */
-    public function handle(VaultNode $node, array $attributes): VaultNode
+    public function handle(VaultNode $node, array $attributes, ?int $expectedRevision = null): VaultNode
     {
         $originalPath = app(GetPathFromVaultNode::class)->handle($node);
         $originalLinkPath = '';
@@ -29,26 +30,61 @@ final readonly class UpdateVaultNode
             && $attributes['name'] !== $node->name;
         $isParentIdAttributeChanged = array_key_exists('parent_id', $attributes)
             && $attributes['parent_id'] !== $node->parent_id;
+        $isContentAttributeChanged = array_key_exists('content', $attributes)
+            && $attributes['content'] !== $node->content;
+
+        $attributes = array_filter(
+            $attributes,
+            fn(mixed $value, string $key): bool => $value !== $node->getAttribute($key),
+            ARRAY_FILTER_USE_BOTH,
+        );
+
+        if ($attributes === []) {
+            return $node;
+        }
 
         if ($isNameAttributeChanged || $isParentIdAttributeChanged) {
             $originalLinkPath = $node->fullPath();
         }
 
-        // Save node to database
-        $node->update($attributes);
+        // Save the node using an atomic revision comparison when requested by MCP clients.
+        if ($expectedRevision !== null) {
+            if ($node->revision !== $expectedRevision) {
+                throw new VaultNodeVersionConflict();
+            }
+
+            $updated = $node->newQuery()
+                ->whereKey($node->id)
+                ->where('revision', $expectedRevision)
+                ->update([
+                    ...$attributes,
+                    'revision' => $expectedRevision + 1,
+                ]);
+
+            if ($updated !== 1) {
+                throw new VaultNodeVersionConflict();
+            }
+
+            $node->refresh();
+
+            if ($node->shouldBeSearchable()) {
+                $node->searchable();
+            }
+        } else {
+            $node->update($attributes);
+            $node->refresh();
+        }
 
         // Save content to disk
         if (
-            array_key_exists('content', $attributes)
+            $isContentAttributeChanged
             && $node->is_file
             && in_array($node->extension, Note::extensions())
         ) {
             Storage::disk('local')->put($originalPath, $attributes['content'] ?? '');
         }
 
-        $node->refresh();
-
-        if ($node->is_file && $node->extension === 'md' && $node->wasChanged(['content'])) {
+        if ($node->is_file && $node->extension === 'md' && $isContentAttributeChanged) {
             $previousLinks = $this->getLinks($node);
             app(ProcessVaultNodeLinks::class)->handle($node);
             $newLinks = $this->getLinks($node);
@@ -68,7 +104,7 @@ final readonly class UpdateVaultNode
             }
         }
 
-        if ($node->wasChanged(['name', 'parent_id'])) {
+        if ($isNameAttributeChanged || $isParentIdAttributeChanged) {
             // Rename node on disk
             $path = app(GetPathFromVaultNode::class)->handle($node);
             Storage::disk('local')->move($originalPath, $path);
@@ -77,7 +113,7 @@ final readonly class UpdateVaultNode
             app(UpdateVaultNodeBacklinks::class)->handle($node, $originalLinkPath);
         }
 
-        if ($node->wasChanged(['name'])) {
+        if ($isNameAttributeChanged) {
             $backlinks = $node->backlinks()->get();
 
             // Broadcast events

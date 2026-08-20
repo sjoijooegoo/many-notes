@@ -101,14 +101,16 @@ final readonly class VaultMcpTokenController
         return $this->privateJson([]);
     }
 
-    private function appliesToVault(
-        PersonalAccessToken $token,
-        Vault $vault,
-        McpVaultAccess $access,
-    ): bool {
-        return $token->can(McpVaultAccess::READ_ALL_VISIBLE_ABILITY)
-            || $token->can($access->ability($vault->id, McpVaultAccess::READ))
-            || $token->can($access->ability($vault->id, McpVaultAccess::WRITE));
+    private function appliesToVault(PersonalAccessToken $token, Vault $vault, McpVaultAccess $access): bool
+    {
+        if ($token->can(McpVaultAccess::READ_ALL_VISIBLE_ABILITY)) {
+            return true;
+        }
+        if ($token->can($access->ability($vault->id, McpVaultAccess::READ))) {
+            return true;
+        }
+
+        return $token->can($access->ability($vault->id, McpVaultAccess::WRITE));
     }
 
     /** @return array<string, bool|int|string|null> */
