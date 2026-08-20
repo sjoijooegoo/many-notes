@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Actions\CreateVault;
 use App\Actions\CreateVaultNode;
+use App\Actions\GetPathFromVaultNode;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 
 it('moves a node to a folder', function (): void {
     $user = User::factory()->create();
@@ -35,6 +37,39 @@ it('moves a node to a folder', function (): void {
 
     $response->assertStatus(200);
     expect($file->refresh()->parent_id)->toBe($folder->id);
+});
+
+it('preserves note content on disk when moving a node', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $folder = new CreateVaultNode()->handle($vault, [
+        'is_file' => false,
+        'name' => 'destination',
+    ]);
+    $content = '# Existing content';
+    $file = new CreateVaultNode()->handle($vault, [
+        'is_file' => true,
+        'name' => 'note',
+        'extension' => 'md',
+        'content' => $content,
+    ]);
+
+    $this->actingAs($user)
+        ->patch(
+            route('vaults.nodes.move', [
+                'vault' => $vault->id,
+                'node' => $file->id,
+            ]),
+            ['parent_id' => $folder->id],
+        )
+        ->assertOk();
+
+    $file->refresh();
+    $path = new GetPathFromVaultNode()->handle($file);
+
+    expect(Storage::disk('local')->get($path))->toBe($content);
 });
 
 it('moves a node to the root', function (): void {

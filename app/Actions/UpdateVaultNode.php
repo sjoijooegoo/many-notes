@@ -38,7 +38,11 @@ final readonly class UpdateVaultNode
         $node->update($attributes);
 
         // Save content to disk
-        if ($node->is_file && in_array($node->extension, Note::extensions())) {
+        if (
+            array_key_exists('content', $attributes)
+            && $node->is_file
+            && in_array($node->extension, Note::extensions())
+        ) {
             Storage::disk('local')->put($originalPath, $attributes['content'] ?? '');
         }
 

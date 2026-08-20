@@ -1,0 +1,33 @@
+www.jcrewnote.top {
+	redir https://jcrewnote.top{uri} permanent
+}
+
+jcrewnote.top {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}
+
+mcp.jcrewnote.top {
+	encode zstd gzip
+
+	@mcp path /mcp
+	handle @mcp {
+		reverse_proxy 127.0.0.1:8080 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+proxy.jcrewnote.top {
+	encode zstd gzip
+	@management path /v0/management*
+	respond @management 404
+
+	reverse_proxy 127.0.0.1:8317 {
+		flush_interval -1
+	}
+}

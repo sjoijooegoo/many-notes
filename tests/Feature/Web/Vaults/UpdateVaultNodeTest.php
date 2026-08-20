@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\CreateVault;
 use App\Actions\CreateVaultNode;
 use App\Actions\GetPathFromVault;
+use App\Actions\GetPathFromVaultNode;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 
@@ -35,6 +36,35 @@ it('updates a node', function (): void {
     expect($vault->nodes()->first()->name)->toBe($newName);
     $path = new GetPathFromVault()->handle($vault) . $newName;
     expect(Storage::disk('local')->path($path))->toBeDirectory();
+});
+
+it('preserves note content on disk when renaming a node', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $content = '# Existing content';
+    $node = new CreateVaultNode()->handle($vault, [
+        'is_file' => true,
+        'name' => 'original name',
+        'extension' => 'md',
+        'content' => $content,
+    ]);
+
+    $this->actingAs($user)
+        ->patch(
+            route('vaults.nodes.update', [
+                'vault' => $vault->id,
+                'node' => $node->id,
+            ]),
+            ['name' => 'renamed note'],
+        )
+        ->assertOk();
+
+    $node->refresh();
+    $path = new GetPathFromVaultNode()->handle($node);
+
+    expect(Storage::disk('local')->get($path))->toBe($content);
 });
 
 it('updates note links when updating a node', function (): void {

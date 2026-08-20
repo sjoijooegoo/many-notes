@@ -20,9 +20,11 @@
 - Drag image files into either the visual editor or raw Markdown editor.
 - Store new uploads under `attachments/images` beside the current note and insert the Markdown reference automatically.
 - Support PNG, JPEG, GIF, WebP, and AVIF images.
+- Provide a vault-scoped remote MCP endpoint for authorized AI clients, without document deletion tools.
 - Build on the pinned upstream container while preserving the existing database and vault bind mounts.
 
 See [image paste and storage behavior](./docs/customizations/image-paste-upload.md) for details and
+[the remote MCP server guide](./docs/customizations/mcp-server.md) for AI client access, and
 [the jcrEw deployment runbook](./DEPLOYMENT.jcrewnote.md) for build, deployment, backup, and rollback instructions.
 
 ### Quick deployment

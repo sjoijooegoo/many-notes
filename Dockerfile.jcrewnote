@@ -1,5 +1,25 @@
 FROM brufdev/many-notes@sha256:dc534206a4b39fc78c0528e0bbf0dba816e2f5a55cb6b22182e3678b3c54a16b AS upstream
 
+FROM upstream AS backend
+
+USER root
+WORKDIR /var/www/html
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY composer.json composer.lock ./
+COPY app ./app
+COPY bootstrap ./bootstrap
+COPY config ./config
+COPY database ./database
+COPY routes ./routes
+
+RUN COMPOSER_ALLOW_SUPERUSER=1 composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader \
+    --ignore-platform-req=ext-sockets
+
 FROM node:22-alpine AS frontend
 WORKDIR /app
 
@@ -17,7 +37,7 @@ COPY --from=upstream /var/www/html/resources/js/wayfinder ./resources/js/wayfind
 ENV SKIP_WAYFINDER=1
 RUN npm run build
 
-FROM upstream
+FROM backend
 
 USER root
 ARG UID=1000
