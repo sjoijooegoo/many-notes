@@ -21,6 +21,7 @@ use App\Http\Controllers\VaultEditorApplyTemplateController;
 use App\Http\Controllers\VaultEditorSearchController;
 use App\Http\Controllers\VaultExportController;
 use App\Http\Controllers\VaultImportController;
+use App\Http\Controllers\VaultMcpTokenController;
 use App\Http\Controllers\VaultNodeChildrenController;
 use App\Http\Controllers\VaultNodeController;
 use App\Http\Controllers\VaultNodeImportController;
@@ -69,6 +70,16 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::get('vaults/{vault}/search', VaultSearchController::class)->name('vaults.search');
+
+    Route::prefix('vaults/{vault}/mcp-tokens')->name('vaults.mcp-tokens.')->group(function (): void {
+        Route::get('', [VaultMcpTokenController::class, 'index'])->name('index');
+        Route::post('', [VaultMcpTokenController::class, 'store'])
+            ->middleware('throttle:20,1')
+            ->name('store');
+        Route::delete('{token}', [VaultMcpTokenController::class, 'destroy'])
+            ->middleware('throttle:20,1')
+            ->name('destroy');
+    });
 
     Route::prefix('vaults/{vault}/editor')->name('vaults.editor.')->group(function (): void {
         Route::get('search', VaultEditorSearchController::class)->name('search');

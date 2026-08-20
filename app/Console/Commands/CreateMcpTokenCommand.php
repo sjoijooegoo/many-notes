@@ -16,6 +16,7 @@ final class CreateMcpTokenCommand extends Command
         {vault : Vault ID}
         {--name=AI client : Token name}
         {--read-only : Do not allow creating or updating documents}
+        {--read-all-vaults : Allow reading every vault currently visible to this user, including future vaults}
         {--expires=365 : Expiration in days}';
 
     protected $description = 'Create a vault-scoped API token for the Many Notes MCP server';
@@ -48,6 +49,10 @@ final class CreateMcpTokenCommand extends Command
         }
 
         $abilities = [$access->ability($vault->id, McpVaultAccess::READ)];
+
+        if ((bool) $this->option('read-all-vaults')) {
+            $abilities[] = McpVaultAccess::READ_ALL_VISIBLE_ABILITY;
+        }
 
         if (!$readOnly) {
             $abilities[] = $access->ability($vault->id, McpVaultAccess::WRITE);

@@ -18,6 +18,8 @@ final readonly class McpVaultAccess
 
     public const WRITE = 'write';
 
+    public const READ_ALL_VISIBLE_ABILITY = 'mcp:vaults:read';
+
     public function user(Request $request): ?User
     {
         $user = $request->user();
@@ -37,7 +39,7 @@ final readonly class McpVaultAccess
     {
         $user = $this->user($request);
 
-        if (!$user || !$user->tokenCan($this->ability($vaultId, $ability))) {
+        if (!$user || !$this->tokenCanAccessVault($user, $vaultId, $ability)) {
             return null;
         }
 
@@ -61,9 +63,12 @@ final readonly class McpVaultAccess
             return new Collection();
         }
 
+        $canReadAllVisibleVaults = $user->tokenCan(self::READ_ALL_VISIBLE_ABILITY);
+
         return app(VisibleVaultsQuery::class)($user)
             ->get()
-            ->filter(fn(Vault $vault): bool => $user->tokenCan($this->ability($vault->id, self::READ)))
+            ->filter(fn(Vault $vault): bool => $canReadAllVisibleVaults
+                || $user->tokenCan($this->ability($vault->id, self::READ)))
             ->values();
     }
 
@@ -110,5 +115,14 @@ final readonly class McpVaultAccess
     public function ability(int $vaultId, string $ability): string
     {
         return "mcp:vault:{$vaultId}:{$ability}";
+    }
+
+    private function tokenCanAccessVault(User $user, int $vaultId, string $ability): bool
+    {
+        if ($user->tokenCan($this->ability($vaultId, $ability))) {
+            return true;
+        }
+
+        return $ability === self::READ && $user->tokenCan(self::READ_ALL_VISIBLE_ABILITY);
     }
 }

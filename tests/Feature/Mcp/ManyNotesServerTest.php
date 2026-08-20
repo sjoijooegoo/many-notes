@@ -28,6 +28,52 @@ it('only lists vaults granted to the API token', function (): void {
         ->assertDontSee('Other vault');
 });
 
+it('reads every currently visible vault with the global read ability', function (): void {
+    $user = User::factory()->create();
+    $firstVault = new CreateVault()->handle($user, ['name' => 'First vault']);
+    $secondVault = new CreateVault()->handle($user, ['name' => 'Second vault']);
+    $token = $user->createToken('test', [
+        "mcp:vault:{$firstVault->id}:read",
+        App\Mcp\Support\McpVaultAccess::READ_ALL_VISIBLE_ABILITY,
+    ]);
+    $user->withAccessToken($token->accessToken);
+
+    ManyNotesServer::actingAs($user)
+        ->tool(ListVaultsTool::class)
+        ->assertOk()
+        ->assertSee('First vault')
+        ->assertSee('Second vault');
+
+    ManyNotesServer::actingAs($user)
+        ->tool(CreateDocumentTool::class, [
+            'vault_id' => $secondVault->id,
+            'name' => 'Write should fail',
+        ])
+        ->assertHasErrors(['Access denied']);
+});
+
+it('stops globally readable tokens from seeing a collaboration after access is revoked', function (): void {
+    [$owner, $collaborator] = User::factory(2)->create();
+    $vault = new CreateVault()->handle($owner, ['name' => 'Shared vault']);
+    $vault->collaborators()->attach($collaborator, ['accepted' => true]);
+    $token = $collaborator->createToken('test', [
+        App\Mcp\Support\McpVaultAccess::READ_ALL_VISIBLE_ABILITY,
+    ]);
+    $collaborator->withAccessToken($token->accessToken);
+
+    ManyNotesServer::actingAs($collaborator)
+        ->tool(ListVaultsTool::class)
+        ->assertOk()
+        ->assertSee('Shared vault');
+
+    $vault->collaborators()->detach($collaborator);
+
+    ManyNotesServer::actingAs($collaborator)
+        ->tool(ListVaultsTool::class)
+        ->assertOk()
+        ->assertDontSee('Shared vault');
+});
+
 it('does not treat a browser session as an MCP API token', function (): void {
     $user = User::factory()->create();
     new CreateVault()->handle($user, ['name' => 'Private vault']);

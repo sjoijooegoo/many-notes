@@ -22,7 +22,25 @@ The server never exposes a document or file deletion tool.
 Updates use optimistic concurrency control: call `get_document` first, then pass its `updated_at` value as
 `expected_updated_at`. The update is rejected if another client changed the document in the meantime.
 
-## Create a token
+## Manage tokens in the web interface
+
+Open a vault, select the menu beside its name, and choose **MCP API tokens**. The modal lets the current user:
+
+- copy the MCP endpoint;
+- create a named token with an expiration date;
+- keep reading limited to the current vault, or explicitly allow reading every vault visible to the account;
+- allow creating and updating notes only in the currently open vault;
+- review creation, last-used, and expiration times; and
+- revoke one of their own tokens immediately.
+
+The all-visible-vaults option is dynamic: it includes accepted collaboration vaults and vaults the user creates or
+joins later. Existing vault policies are checked on every request, so revoking collaboration access also removes
+the token's access to that vault.
+
+The plaintext token is displayed only once after creation. The interface never exposes document deletion and
+never reveals an existing token secret.
+
+## Create a token from the command line
 
 Run the command in the production container, replacing the email address and vault ID:
 
@@ -33,6 +51,9 @@ docker exec -it many-notes-many-notes-1 \
 
 Add `--read-only` when the client should only list, search, and read documents. The plaintext token is displayed
 only once, so store it in the client's secret storage instead of committing it to a repository.
+
+Add `--read-all-vaults` to allow reading every vault currently or subsequently visible to the account. This does
+not grant write access to those other vaults.
 
 List token metadata without revealing secrets:
 
