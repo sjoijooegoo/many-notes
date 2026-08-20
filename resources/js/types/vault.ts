@@ -32,9 +32,10 @@ export interface VaultNode {
     vault_id: number;
     parent_id: number | null;
     is_file: boolean;
-    type: 'audio' | 'folder' | 'image' | 'note' | 'pdf' | 'video';
+    type: 'audio' | 'file' | 'folder' | 'image' | 'note' | 'pdf' | 'text' | 'video';
     name: string;
     extension: string | null;
+    mime_type: string | null;
     full_path: string;
     url: string;
     content: string | null;

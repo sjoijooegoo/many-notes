@@ -6,6 +6,10 @@ namespace App\Actions;
 
 use App\Models\User;
 use App\Models\Vault;
+use App\Services\EditableTextFile;
+use App\Services\VaultFile;
+use App\Services\VaultFileName;
+use finfo;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 
@@ -57,11 +61,17 @@ final readonly class ProcessDiskVault
 
         /** @var string $file */
         foreach ($files as $file) {
-            $pathInfo = pathinfo($file);
+            $fileNameParts = VaultFileName::split($file);
+            $content = (string) file_get_contents("/$file");
             $attributes['is_file'] = true;
-            $attributes['name'] = $pathInfo['filename'];
-            $attributes['extension'] = $pathInfo['extension'] ?? 'md';
-            $attributes['content'] = (string) file_get_contents("/$file");
+            $attributes['name'] = $fileNameParts['name'];
+            $attributes['extension'] = $fileNameParts['extension'];
+            $attributes['mime_type'] = new finfo(FILEINFO_MIME_TYPE)->file("/$file") ?: '';
+            $attributes['content'] = $content;
+            $attributes['editable_text'] = (!VaultFile::validate(
+                $attributes['extension'],
+                $attributes['mime_type'],
+            ) || $attributes['extension'] === 'md') && EditableTextFile::detect($content) !== null;
             $createVaultNode->handle($vault, $attributes, false);
         }
     }

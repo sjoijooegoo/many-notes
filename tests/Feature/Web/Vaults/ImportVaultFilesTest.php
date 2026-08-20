@@ -175,12 +175,15 @@ it('creates tags when importing a markdown file', function (): void {
     expect($vault->nodes()->first()->tags()->count())->toBe(2);
 });
 
-it('does not import a file with a non-allowed extension', function (): void {
+it('imports an arbitrary UTF-8 text file as editable text', function (): void {
     $user = User::factory()->create();
     $vault = app(CreateVault::class)->handle($user, [
         'name' => fake()->words(3, true),
     ]);
-    $uploadFile = UploadedFile::fake()->create('note.sh');
+    $content = "{\n  \"enabled\": true\n}";
+    $uploadFile = UploadedFile::fake()
+        ->createWithContent('settings.json', $content)
+        ->mimeType('application/json');
 
     $this->actingAs($user);
 
@@ -193,10 +196,136 @@ it('does not import a file with a non-allowed extension', function (): void {
     );
 
     $response->assertStatus(200);
-    expect($response->content())
-        ->json()
-        ->files
-        ->toBe([]);
+    $node = $vault->nodes()->first();
+    expect($node)
+        ->extension->toBe('json')
+        ->mime_type->toBe('application/json')
+        ->content->toBe($content)
+        ->and($node->type()->value)->toBe('text');
+    expect(Storage::disk('local')->get(app(GetPathFromVaultNode::class)->handle($node)))
+        ->toBe($content);
+});
+
+it('imports an arbitrary binary file without treating it as editable text', function (): void {
+    $user = User::factory()->create();
+    $vault = app(CreateVault::class)->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $content = "\x00\x01\x02binary";
+    $uploadFile = UploadedFile::fake()
+        ->createWithContent('payload.custom', $content)
+        ->mimeType('application/octet-stream');
+
+    $this->actingAs($user);
+
+    $this->post(
+        route('vaults.nodes.import', ['vault' => $vault->id]),
+        [
+            'parent_id' => null,
+            'files' => [$uploadFile],
+        ],
+    )->assertOk();
+
+    $node = $vault->nodes()->first();
+    expect($node)
+        ->extension->toBe('custom')
+        ->content->toBeNull()
+        ->and($node->type()->value)->toBe('file');
+    expect(Storage::disk('local')->get(app(GetPathFromVaultNode::class)->handle($node)))
+        ->toBe($content);
+});
+
+it('preserves extensionless and dotfile names', function (): void {
+    $user = User::factory()->create();
+    $vault = app(CreateVault::class)->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $license = UploadedFile::fake()->createWithContent('LICENSE', 'License text')->mimeType('text/plain');
+    $environment = UploadedFile::fake()->createWithContent('.env', 'APP_ENV=local')->mimeType('text/plain');
+
+    $this->actingAs($user)
+        ->post(
+            route('vaults.nodes.import', ['vault' => $vault->id]),
+            [
+                'parent_id' => null,
+                'files' => [$license, $environment],
+            ],
+        )
+        ->assertOk();
+
+    $nodes = $vault->nodes()->orderBy('id')->get();
+    expect($nodes->get(0)->name)->toBe('LICENSE')
+        ->and($nodes->get(0)->extension)->toBe('')
+        ->and($nodes->get(1)->name)->toBe('.env')
+        ->and($nodes->get(1)->extension)->toBe('');
+    expect(Storage::disk('local')->exists(app(GetPathFromVaultNode::class)->handle($nodes->get(0))))
+        ->toBeTrue()
+        ->and(Storage::disk('local')->exists(app(GetPathFromVaultNode::class)->handle($nodes->get(1))))
+        ->toBeTrue();
+});
+
+it('creates a folder tree from relative upload paths', function (): void {
+    $user = User::factory()->create();
+    $vault = app(CreateVault::class)->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $firstFile = UploadedFile::fake()
+        ->createWithContent('readme.txt', 'plain text')
+        ->mimeType('text/plain');
+    $secondFile = UploadedFile::fake()
+        ->createWithContent('config.yaml', "enabled: true\n")
+        ->mimeType('text/plain');
+
+    $this->actingAs($user);
+
+    $response = $this->post(
+        route('vaults.nodes.import', ['vault' => $vault->id]),
+        [
+            'parent_id' => null,
+            'root_name' => 'Project files',
+            'relative_paths' => [
+                'docs/readme.txt',
+                'config/app/config.yaml',
+            ],
+            'files' => [$firstFile, $secondFile],
+        ],
+    );
+
+    $response->assertOk()->assertJsonCount(2, 'files');
+    $root = $vault->nodes()->where('name', 'Project files')->where('is_file', false)->firstOrFail();
+    $docs = $vault->nodes()->where('parent_id', $root->id)->where('name', 'docs')->firstOrFail();
+    $config = $vault->nodes()->where('parent_id', $root->id)->where('name', 'config')->firstOrFail();
+    $app = $vault->nodes()->where('parent_id', $config->id)->where('name', 'app')->firstOrFail();
+
+    expect($vault->nodes()->where('parent_id', $docs->id)->where('name', 'readme')->exists())
+        ->toBeTrue()
+        ->and($vault->nodes()->where('parent_id', $app->id)->where('name', 'config')->exists())
+        ->toBeTrue();
+    $response->assertJsonPath('root.id', $root->id);
+});
+
+it('skips relative paths containing traversal segments', function (): void {
+    $user = User::factory()->create();
+    $vault = app(CreateVault::class)->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $uploadFile = UploadedFile::fake()
+        ->createWithContent('secret.txt', 'secret')
+        ->mimeType('text/plain');
+
+    $this->actingAs($user);
+
+    $response = $this->post(
+        route('vaults.nodes.import', ['vault' => $vault->id]),
+        [
+            'parent_id' => null,
+            'relative_paths' => ['../secret.txt'],
+            'files' => [$uploadFile],
+        ],
+    );
+
+    $response->assertOk()->assertJsonCount(0, 'files')->assertJsonCount(1, 'skipped_files');
+    expect($vault->nodes()->count())->toBe(0);
 });
 
 it('does not import a file without permissions', function (): void {

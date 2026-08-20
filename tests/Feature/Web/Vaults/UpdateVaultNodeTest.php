@@ -67,6 +67,37 @@ it('preserves note content on disk when renaming a node', function (): void {
     expect(Storage::disk('local')->get($path))->toBe($content);
 });
 
+it('updates an imported plain text file in the database and on disk', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $node = new CreateVaultNode()->handle($vault, [
+        'is_file' => true,
+        'name' => 'settings',
+        'extension' => 'json',
+        'mime_type' => 'application/json',
+        'content' => '{"enabled":false}',
+        'editable_text' => true,
+    ]);
+    $updatedContent = '{"enabled":true}';
+
+    $this->actingAs($user)
+        ->patch(
+            route('vaults.nodes.update', [
+                'vault' => $vault->id,
+                'node' => $node->id,
+            ]),
+            ['content' => $updatedContent],
+        )
+        ->assertOk();
+
+    $node->refresh();
+    expect($node->content)->toBe($updatedContent)
+        ->and(Storage::disk('local')->get(new GetPathFromVaultNode()->handle($node)))
+        ->toBe($updatedContent);
+});
+
 it('updates note links when updating a node', function (): void {
     $user = User::factory()->create();
     $vault = new CreateVault()->handle($user, [

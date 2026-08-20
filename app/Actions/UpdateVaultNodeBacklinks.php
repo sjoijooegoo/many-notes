@@ -33,9 +33,12 @@ final readonly class UpdateVaultNodeBacklinks
             $replacementLinkPath = $node->ancestorsAndSelf()->get()->last()->full_path;
         }
 
+        $extensionPattern = $node->extension
+            ? ($node->extension === 'md' ? "(?:\.$node->extension)?" : "\.$node->extension")
+            : '';
         $originalLinkPattern = '\/?'
             . str_replace(' ', '\s', preg_quote($originalLinkPath, '/'))
-            . ($node->extension === 'md' ? "(?:\.$node->extension)?" : "\.$node->extension");
+            . $extensionPattern;
         $pattern = <<<REGEX
             /
             \[(.*?)\]                 # Match a markdown-style link text [any text]
@@ -45,7 +48,8 @@ final readonly class UpdateVaultNodeBacklinks
             \)                        # Match closing parenthesis ")"
             /x
         REGEX;
-        $replacement = "[$1](/$replacementLinkPath.$node->extension$2)";
+        $extension = $node->extension ? ".$node->extension" : '';
+        $replacement = "[$1](/$replacementLinkPath$extension$2)";
 
         foreach ($backlinks as $backlink) {
             $content = preg_replace(

@@ -36,6 +36,7 @@ final readonly class VaultNodeController
          */
         $data = $request->validated();
         $data['extension'] = $data['is_file'] ? 'md' : null;
+        $data['mime_type'] = $data['is_file'] ? 'text/markdown' : null;
 
         $node = $createVaultNode->handle($vault, $data);
 

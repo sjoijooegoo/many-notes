@@ -9,8 +9,8 @@ use App\Events\VaultOpenedFileDataUpdatedEvent;
 use App\Events\VaultTagListUpdatedEvent;
 use App\Exceptions\VaultNodeVersionConflict;
 use App\Models\VaultNode;
-use App\Services\VaultFiles\Types\Note;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 final readonly class UpdateVaultNode
 {
@@ -32,6 +32,12 @@ final readonly class UpdateVaultNode
             && $attributes['parent_id'] !== $node->parent_id;
         $isContentAttributeChanged = array_key_exists('content', $attributes)
             && $attributes['content'] !== $node->content;
+
+        if ($isContentAttributeChanged && !$node->isEditableText()) {
+            throw ValidationException::withMessages([
+                'content' => __('Binary files cannot be edited as text.'),
+            ]);
+        }
 
         $attributes = array_filter(
             $attributes,
@@ -79,7 +85,7 @@ final readonly class UpdateVaultNode
         if (
             $isContentAttributeChanged
             && $node->is_file
-            && in_array($node->extension, Note::extensions())
+            && $node->isEditableText()
         ) {
             Storage::disk('local')->put($originalPath, $attributes['content'] ?? '');
         }

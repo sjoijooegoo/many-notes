@@ -16,9 +16,11 @@ import DocumentDuplicate from '@/icons/DocumentDuplicate.vue';
 import DocumentPlus from '@/icons/DocumentPlus.vue';
 import EllipsisVertical from '@/icons/EllipsisVertical.vue';
 import FileAudio from '@/icons/FileAudio.vue';
+import FileGeneric from '@/icons/FileGeneric.vue';
 import FileImage from '@/icons/FileImage.vue';
 import FileMarkdown from '@/icons/FileMarkdown.vue';
 import FilePDF from '@/icons/FilePDF.vue';
+import FileText from '@/icons/FileText.vue';
 import FileVideo from '@/icons/FileVideo.vue';
 import FolderPlus from '@/icons/FolderPlus.vue';
 import PencilSquare from '@/icons/PencilSquare.vue';
@@ -63,6 +65,11 @@ const isTemplateFolder = computed(() => vaultStore.isTemplateFolder(props.nodeId
 const isExpanded = computed(() => vaultTreeStore.isFolderExpanded(props.nodeId));
 const isSelected = computed(() => vaultTreeStore.getSelectedFileId() === props.nodeId);
 const isLoading = computed(() => vaultTreeStore.isFolderLoading(props.nodeId));
+const displayName = computed(() =>
+    node.value.is_file && node.value.extension && node.value.extension !== 'md'
+        ? `${node.value.name}.${node.value.extension}`
+        : node.value.name
+);
 
 function handleClick() {
     if (node.value.is_file) {
@@ -121,7 +128,7 @@ const isValidDropAfter = computed(() => {
         >
             <div
                 class="flex min-w-0 flex-1 items-center gap-2 py-1"
-                :title="node.name"
+                :title="displayName"
                 @click="handleClick"
             >
                 <span class="flex shrink-0 items-center justify-center gap-2">
@@ -134,13 +141,15 @@ const isValidDropAfter = computed(() => {
                         />
                     </template>
                     <FileMarkdown v-else-if="node.extension === 'md'" class="h-4 w-4 opacity-70" />
+                    <FileText v-else-if="node.type === 'text'" class="h-4 w-4 opacity-70" />
                     <FileAudio v-else-if="node.type === 'audio'" class="h-4 w-4 opacity-70" />
                     <FileImage v-else-if="node.type === 'image'" class="h-4 w-4 opacity-70" />
                     <FilePDF v-else-if="node.type === 'pdf'" class="h-4 w-4 opacity-70" />
                     <FileVideo v-else-if="node.type === 'video'" class="h-4 w-4 opacity-70" />
+                    <FileGeneric v-else class="h-4 w-4 opacity-70" />
                 </span>
                 <span class="truncate">
-                    {{ node.name }}
+                    {{ displayName }}
                 </span>
             </div>
             <Menu type="dropdown">

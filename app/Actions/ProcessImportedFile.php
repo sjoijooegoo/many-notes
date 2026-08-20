@@ -6,14 +6,22 @@ namespace App\Actions;
 
 use App\Models\Vault;
 use App\Models\VaultNode;
-use App\Services\VaultFiles\Types\Note;
+use App\Services\EditableTextFile;
+use App\Services\VaultFile;
+use App\Services\VaultFileName;
 use Illuminate\Http\File;
 use Illuminate\Support\Facades\Storage;
 
 final readonly class ProcessImportedFile
 {
-    public function handle(Vault $vault, ?VaultNode $parent, string $fileName, string $filePath): VaultNode
-    {
+    public function handle(
+        Vault $vault,
+        ?VaultNode $parent,
+        string $fileName,
+        string $filePath,
+        string $mimeType,
+        bool $broadcast = true,
+    ): VaultNode {
         $createVaultNode = app(CreateVaultNode::class);
         $getPathFromVaultNode = app(GetPathFromVaultNode::class);
 
@@ -21,19 +29,20 @@ final readonly class ProcessImportedFile
             'parent_id' => $parent?->id,
             'is_file' => true,
         ];
-        $pathInfo = pathinfo($fileName);
-        $attributes['name'] = $pathInfo['filename'];
-        $attributes['extension'] = $pathInfo['extension'] ?? '';
-        $attributes['content'] = null;
+        $fileNameParts = VaultFileName::split($fileName);
+        $attributes['name'] = $fileNameParts['name'];
+        $attributes['extension'] = $fileNameParts['extension'];
+        $attributes['mime_type'] = $mimeType;
+        $editableContent = VaultFile::validate($attributes['extension'], $mimeType)
+            && $attributes['extension'] !== 'md'
+            ? null
+            : EditableTextFile::read($filePath);
+        $attributes['content'] = $editableContent;
+        $attributes['editable_text'] = $editableContent !== null;
 
-        if (in_array($attributes['extension'], Note::extensions())) {
-            $attributes['extension'] = 'md';
-            $attributes['content'] = (string) file_get_contents($filePath);
-        }
+        $node = $createVaultNode->handle($vault, $attributes, broadcast: $broadcast);
 
-        $node = $createVaultNode->handle($vault, $attributes);
-
-        if ($node->extension !== 'md') {
+        if ($editableContent === null) {
             $relativePath = $getPathFromVaultNode->handle($node);
             $pathInfo = pathinfo($relativePath);
             $savePath = $pathInfo['dirname'] ?? '';

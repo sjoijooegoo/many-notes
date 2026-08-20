@@ -89,3 +89,25 @@ it('return a 404 error if the giving node is from another vault', function (): v
         ->get($imageUrl . '&node=' . $textNode->id)
         ->assertStatus(404);
 });
+
+it('forces unknown files to download and disables content sniffing', function (): void {
+    $user = User::factory()->create();
+    $vault = new CreateVault()->handle($user, [
+        'name' => fake()->words(3, true),
+    ]);
+    $node = new CreateVaultNode()->handle($vault, [
+        'is_file' => true,
+        'name' => 'untrusted',
+        'extension' => 'html',
+        'mime_type' => 'text/html',
+        'content' => '<script>alert(1)</script>',
+        'editable_text' => true,
+    ]);
+
+    $response = $this->actingAs($user)->get(new GetUrlFromVaultNode()->handle($node));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toStartWith('attachment;')
+        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
+        ->and($response->headers->get('Content-Security-Policy'))->toContain('sandbox');
+});

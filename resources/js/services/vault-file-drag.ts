@@ -8,7 +8,16 @@ export interface VaultFileDragPayload {
     type: VaultNode['type'];
 }
 
-const vaultFileTypes: VaultNode['type'][] = ['audio', 'folder', 'image', 'note', 'pdf', 'video'];
+const vaultFileTypes: VaultNode['type'][] = [
+    'audio',
+    'file',
+    'folder',
+    'image',
+    'note',
+    'pdf',
+    'text',
+    'video',
+];
 
 function isVaultFileType(value: unknown): value is VaultNode['type'] {
     return typeof value === 'string' && vaultFileTypes.includes(value as VaultNode['type']);

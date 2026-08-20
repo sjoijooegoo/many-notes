@@ -7,10 +7,12 @@ import VaultSearchModal from '@/components/modal/VaultSearchModal.vue';
 import VaultTree from '@/components/tree/VaultTree.vue';
 import VaultFile from '@/components/vault/VaultFile.vue';
 import VaultFileAudio from '@/components/vault/VaultFileAudio.vue';
+import VaultFileGeneric from '@/components/vault/VaultFileGeneric.vue';
 import VaultFileIcon from '@/components/vault/VaultFileIcon.vue';
 import VaultFileImage from '@/components/vault/VaultFileImage.vue';
 import VaultFileNote from '@/components/vault/VaultFileNote.vue';
 import VaultFilePdf from '@/components/vault/VaultFilePdf.vue';
+import VaultFileText from '@/components/vault/VaultFileText.vue';
 import VaultFileVideo from '@/components/vault/VaultFileVideo.vue';
 import VaultToggleContentWidthButton from '@/components/vault/VaultToggleContentWidthButton.vue';
 import { useContentWidthPreference } from '@/composables/useContentWidthPreference';
@@ -181,6 +183,12 @@ function updateViewportWidth(): void {
     viewportWidth.value = window.innerWidth;
 }
 
+function displayFileName(file: Pick<VaultNode, 'name' | 'extension'>): string {
+    return file.extension && file.extension !== 'md'
+        ? `${file.name}.${file.extension}`
+        : file.name;
+}
+
 useContentWidthPreference(mainSectionRef);
 syncPanelsWithScreen(isSmallScreen.value);
 
@@ -188,6 +196,8 @@ const vaultFileKey = ref(0);
 const openedFile = ref(props.openedFile ?? null);
 const fileComponents = {
     note: VaultFileNote,
+    text: VaultFileText,
+    file: VaultFileGeneric,
     image: VaultFileImage,
     pdf: VaultFilePdf,
     video: VaultFileVideo,
@@ -301,11 +311,14 @@ useEcho<{ data: VaultNode }>(`Vault.${props.vault.id}`, 'VaultNodeUpdatedEvent',
         }
 
         if (
-            payload.data.type === 'note' &&
+            (payload.data.type === 'note' || payload.data.type === 'text') &&
             openedFile.value?.file.content !== payload.data.content
         ) {
             openedFile.value.file.content = payload.data.content;
-            editorContext.value?.setContent(payload.data.content ?? '');
+
+            if (payload.data.type === 'note') {
+                editorContext.value?.setContent(payload.data.content ?? '');
+            }
         }
     }
 });
@@ -505,7 +518,7 @@ useEcho<{ data: { user_id: number } }>(
                                 <span class="flex w-full items-center justify-between">
                                     <span
                                         class="flex min-w-0 flex-1 items-center gap-2 py-1"
-                                        :title="file.name"
+                                        :title="displayFileName(file)"
                                     >
                                         <span
                                             class="flex shrink-0 items-center justify-center gap-2"
@@ -513,7 +526,7 @@ useEcho<{ data: { user_id: number } }>(
                                             <VaultFileIcon :file="file" />
                                         </span>
                                         <span class="truncate">
-                                            {{ file.name }}
+                                            {{ displayFileName(file) }}
                                         </span>
                                     </span>
                                     <span

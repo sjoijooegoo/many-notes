@@ -7,10 +7,10 @@ namespace App\Http\Controllers;
 use App\Actions\GetPathFromVaultNode;
 use App\Actions\GetVaultNodeFromPath;
 use App\Actions\ResolveTwoPaths;
+use App\Enums\VaultNodeType;
 use App\Models\User;
 use App\Models\Vault;
 use App\Models\VaultNode;
-use App\Services\VaultFiles\Types\Note;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -46,15 +46,42 @@ final readonly class FileController
             $path = $resolveTwoPaths->handle($currentPath, $path);
         }
 
-        $node = $getVaultNodeFromPath->handle($vault->id, $path);
+        $target = $request->integer('target');
+        $node = $target > 0
+            ? $vault->nodes()->where('is_file', true)->find($target)
+            : $getVaultNodeFromPath->handle($vault->id, $path);
 
         abort_unless($node instanceof VaultNode, 404);
 
-        abort_if(in_array($node->extension, Note::extensions()), 403);
+        $type = $node->type();
+
+        abort_if($type === VaultNodeType::NOTE, 403);
 
         $relativePath = $getPathFromVaultNode->handle($node);
         $absolutePath = Storage::disk('local')->path($relativePath);
 
-        return response()->file($absolutePath);
+        $headers = [
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+        ];
+
+        if (
+            in_array(
+                $type,
+                [
+                    VaultNodeType::AUDIO,
+                    VaultNodeType::IMAGE,
+                    VaultNodeType::PDF,
+                    VaultNodeType::VIDEO,
+                ],
+                true,
+            )
+        ) {
+            return response()->file($absolutePath, $headers);
+        }
+
+        $extension = $node->extension ? ".{$node->extension}" : '';
+
+        return response()->download($absolutePath, $node->name . $extension, $headers);
     }
 }

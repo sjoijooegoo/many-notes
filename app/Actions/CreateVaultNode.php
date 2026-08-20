@@ -17,7 +17,9 @@ final readonly class CreateVaultNode
      *   is_file: bool,
      *   name: string,
      *   extension?: string|null,
-     *   content?: string|null
+     *   mime_type?: string|null,
+     *   content?: string|null,
+     *   editable_text?: bool,
      * } $attributes
      */
     public function handle(
@@ -28,7 +30,9 @@ final readonly class CreateVaultNode
     ): VaultNode {
         $attributes['parent_id'] ??= null;
         $attributes['extension'] ??= null;
+        $attributes['mime_type'] ??= null;
         $attributes['content'] ??= null;
+        $attributes['editable_text'] ??= $attributes['extension'] === 'md';
 
         // Generate a new filename if the current one already exists
         $nodeExists = $vault->nodes()
@@ -55,12 +59,15 @@ final readonly class CreateVaultNode
         }
 
         // Save node to database
-        $databaseContent = $attributes['extension'] === 'md' ? $attributes['content'] : null;
+        $databaseContent = $attributes['editable_text']
+            ? (string) ($attributes['content'] ?? '')
+            : null;
         $node = $vault->nodes()->create([
             'parent_id' => $attributes['parent_id'],
             'is_file' => $attributes['is_file'],
             'name' => $attributes['name'],
             'extension' => $attributes['extension'],
+            'mime_type' => $attributes['mime_type'],
             'content' => $databaseContent,
         ]);
 

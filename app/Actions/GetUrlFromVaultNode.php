@@ -17,6 +17,8 @@ final readonly class GetUrlFromVaultNode
          */
         $fullPath = $node->ancestorsAndSelf()->get()->last()->full_path;
 
-        return '/files/' . $node->vault_id . '?path=' . $fullPath . '.' . $node->extension;
+        $extension = $node->extension ? ".{$node->extension}" : '';
+
+        return '/files/' . $node->vault_id . '?path=' . $fullPath . $extension . '&target=' . $node->id;
     }
 }

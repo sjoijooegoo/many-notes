@@ -13,13 +13,15 @@ final class Note implements VaultFileType
 
     private static function extensionsList(): array
     {
-        return ['md', 'txt'];
+        return ['md'];
     }
 
     private static function mimeTypesList(): array
     {
         return [
-            'text/plain', // md, txt
+            'text/plain',
+            'text/markdown',
+            'text/x-markdown',
         ];
     }
 }

@@ -44,7 +44,7 @@ final readonly class ExportVault
     {
         foreach ($nodes as $node) {
             $nodePath = mb_ltrim("$path/$node->name", '/');
-            $nodePath .= $node->is_file ? ".$node->extension" : '';
+            $nodePath .= $node->is_file && $node->extension ? ".$node->extension" : '';
             $relativePath = app(GetPathFromVaultNode::class)->handle($node);
 
             if (!Storage::disk('local')->exists($relativePath)) {
@@ -63,7 +63,7 @@ final readonly class ExportVault
                 if ($node->children()->count()) {
                     $this->exportNodes($zip, $node->children()->get(), $nodePath);
                 }
-            } elseif ($node->extension === 'md') {
+            } elseif ($node->isEditableText()) {
                 $zip->addFromString($nodePath, (string) $node->content);
             } else {
                 $relativePath = app(GetPathFromVaultNode::class)->handle($node);

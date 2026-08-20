@@ -80,14 +80,22 @@ watch(
     <div class="flex h-full w-full flex-col">
         <div class="z-[15] flex flex-col p-4 print:hidden" :class="slots.toolbar ? 'gap-3' : ''">
             <div class="flex items-center justify-between gap-2">
-                <input
-                    v-model="fileName"
-                    class="flex flex-grow border-0 bg-transparent p-0 px-1 text-lg font-semibold focus:ring-0 focus:outline-none"
-                    type="text"
-                    spellcheck="false"
-                    autocomplete="off"
-                    @input="rename(fileName)"
-                />
+                <div class="flex min-w-0 flex-grow items-center">
+                    <input
+                        v-model="fileName"
+                        class="min-w-0 flex-grow border-0 bg-transparent p-0 px-1 text-lg font-semibold focus:ring-0 focus:outline-none"
+                        type="text"
+                        spellcheck="false"
+                        autocomplete="off"
+                        @input="rename(fileName)"
+                    />
+                    <span
+                        v-if="node.extension && node.extension !== 'md'"
+                        class="text-light-base-700 dark:text-base-300 shrink-0 pr-1 text-lg font-semibold"
+                    >
+                        .{{ node.extension }}
+                    </span>
+                </div>
                 <div class="flex items-center gap-3">
                     <VaultFileUpdatingSpinner />
                     <VaultToggleContentWidthButton />

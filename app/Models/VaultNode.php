@@ -28,7 +28,8 @@ use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
  * @property-read int|null $parent_id
  * @property-read bool $is_file
  * @property-read string $name
- * @property-read string $extension
+ * @property-read string|null $extension
+ * @property-read string|null $mime_type
  * @property-read string $full_path
  * @property-read string|null $content
  * @property int $revision
@@ -93,14 +94,39 @@ final class VaultNode extends Model
 
     public function type(): VaultNodeType
     {
+        if (!$this->is_file) {
+            return VaultNodeType::FOLDER;
+        }
+
+        $extension = $this->extension ?? '';
+
+        if ($this->mime_type !== null) {
+            return match (true) {
+                $extension === 'md' && $this->content !== null => VaultNodeType::NOTE,
+                Audio::validate($extension, $this->mime_type) => VaultNodeType::AUDIO,
+                Image::validate($extension, $this->mime_type) => VaultNodeType::IMAGE,
+                Pdf::validate($extension, $this->mime_type) => VaultNodeType::PDF,
+                Video::validate($extension, $this->mime_type) => VaultNodeType::VIDEO,
+                $this->content !== null => VaultNodeType::TEXT,
+                default => VaultNodeType::FILE,
+            };
+        }
+
+        // Legacy nodes predate MIME tracking and retain extension-based previews.
         return match (true) {
-            in_array($this->extension, Audio::extensions()) => VaultNodeType::AUDIO,
-            in_array($this->extension, Note::extensions()) => VaultNodeType::NOTE,
-            in_array($this->extension, Image::extensions()) => VaultNodeType::IMAGE,
-            in_array($this->extension, Pdf::extensions()) => VaultNodeType::PDF,
-            in_array($this->extension, Video::extensions()) => VaultNodeType::VIDEO,
-            default => VaultNodeType::FOLDER,
+            in_array($extension, Audio::extensions()) => VaultNodeType::AUDIO,
+            in_array($extension, Note::extensions()) => VaultNodeType::NOTE,
+            in_array($extension, Image::extensions()) => VaultNodeType::IMAGE,
+            in_array($extension, Pdf::extensions()) => VaultNodeType::PDF,
+            in_array($extension, Video::extensions()) => VaultNodeType::VIDEO,
+            $this->content !== null => VaultNodeType::TEXT,
+            default => VaultNodeType::FILE,
         };
+    }
+
+    public function isEditableText(): bool
+    {
+        return in_array($this->type(), [VaultNodeType::NOTE, VaultNodeType::TEXT], true);
     }
 
     public function fullPath(): string

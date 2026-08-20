@@ -7,9 +7,11 @@ namespace App\Enums;
 enum VaultNodeType: string
 {
     case AUDIO = 'audio';
+    case FILE = 'file';
     case FOLDER = 'folder';
     case IMAGE = 'image';
     case NOTE = 'note';
     case PDF = 'pdf';
+    case TEXT = 'text';
     case VIDEO = 'video';
 }

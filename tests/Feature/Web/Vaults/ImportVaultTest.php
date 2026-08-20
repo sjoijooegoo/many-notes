@@ -89,11 +89,12 @@ it('imports a zip file with files and folders', function (): void {
     $vaults = $user->vaults()->get();
     expect($vaults->count())->toBe(1);
     $nodes = $vaults->first()->nodes()->get();
-    expect($nodes->count())->toBe(2);
-    $path = $getPathFromVaultNode->handle($nodes->get(0));
-    expect(Storage::disk('local')->exists($path))->toBeTrue();
-    $path = $getPathFromVaultNode->handle($nodes->get(1));
-    expect(Storage::disk('local')->exists($path))->toBeTrue();
+    expect($nodes->count())->toBe(3);
+
+    foreach ($nodes as $node) {
+        $path = $getPathFromVaultNode->handle($node);
+        expect(Storage::disk('local')->exists($path))->toBeTrue();
+    }
 });
 
 it('creates links when importing a vault', function (): void {

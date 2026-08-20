@@ -6,8 +6,9 @@ namespace App\Actions;
 
 use App\Events\VaultListUpdatedEvent;
 use App\Models\User;
+use App\Services\EditableTextFile;
 use App\Services\VaultFile;
-use App\Services\VaultFiles\Types\Note;
+use App\Services\VaultFileName;
 use finfo;
 use ZipArchive;
 
@@ -58,19 +59,18 @@ final readonly class ProcessImportedVault
                 $attributes['parent_id'] = $nodeIds[$entryParentDirName];
             } else {
                 $pathInfo = pathinfo($entryName);
+                $fileNameParts = VaultFileName::split($entryName);
                 $entryDirName = $pathInfo['dirname'];
-                $attributes['extension'] = $pathInfo['extension'] ?? '';
+                $attributes['name'] = $fileNameParts['name'];
+                $attributes['extension'] = $fileNameParts['extension'];
                 $attributes['parent_id'] = $nodeIds[$entryDirName];
-                $attributes['content'] = (string) $zip->getFromIndex($i);
-                $fileMimeType = $finfo->buffer($attributes['content']) ?: '';
-
-                if (!VaultFile::validate($attributes['extension'], $fileMimeType)) {
-                    continue;
-                }
-
-                if (in_array($attributes['extension'], Note::extensions())) {
-                    $attributes['extension'] = 'md';
-                }
+                $fileContent = (string) $zip->getFromIndex($i);
+                $attributes['mime_type'] = $finfo->buffer($fileContent) ?: '';
+                $attributes['content'] = $fileContent;
+                $attributes['editable_text'] = (!VaultFile::validate(
+                    $attributes['extension'],
+                    $attributes['mime_type'],
+                ) || $attributes['extension'] === 'md') && EditableTextFile::detect($fileContent) !== null;
             }
 
             $node = $createVaultNode->handle($vault, $attributes, false, false);
